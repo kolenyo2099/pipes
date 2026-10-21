@@ -1,0 +1,1430 @@
+[
+  {
+    "code": "DZ",
+    "name": "Algeria",
+    "cameo": "DZA",
+    "fips": "AG"
+  },
+  {
+    "code": "AO",
+    "name": "Angola",
+    "cameo": "AGO",
+    "fips": "AO"
+  },
+  {
+    "code": "BJ",
+    "name": "Benin",
+    "cameo": "BEN",
+    "fips": "BN"
+  },
+  {
+    "code": "BW",
+    "name": "Botswana",
+    "cameo": "BWA",
+    "fips": "BC"
+  },
+  {
+    "code": "BF",
+    "name": "Burkina Faso",
+    "cameo": "BFA",
+    "fips": "UV"
+  },
+  {
+    "code": "BI",
+    "name": "Burundi",
+    "cameo": "BDI",
+    "fips": "BY"
+  },
+  {
+    "code": "CM",
+    "name": "Cameroon",
+    "cameo": "CMR",
+    "fips": "CM"
+  },
+  {
+    "code": "CV",
+    "name": "Cape Verde",
+    "cameo": "CPV",
+    "fips": "CV"
+  },
+  {
+    "code": "CF",
+    "name": "Central African Republic",
+    "cameo": "CAF",
+    "fips": "CT"
+  },
+  {
+    "code": "TD",
+    "name": "Chad",
+    "cameo": "TCD",
+    "fips": "CD"
+  },
+  {
+    "code": "KM",
+    "name": "Comoros",
+    "cameo": "COM",
+    "fips": "CN"
+  },
+  {
+    "code": "CD",
+    "name": "Congo (DRC)",
+    "cameo": "COD",
+    "fips": "CG"
+  },
+  {
+    "code": "CG",
+    "name": "Congo (Republic)",
+    "cameo": "COG",
+    "fips": "CF"
+  },
+  {
+    "code": "DJ",
+    "name": "Djibouti",
+    "cameo": "DJI",
+    "fips": "DJ"
+  },
+  {
+    "code": "EG",
+    "name": "Egypt",
+    "cameo": "EGY",
+    "fips": "EG"
+  },
+  {
+    "code": "GQ",
+    "name": "Equatorial Guinea",
+    "cameo": "GNQ",
+    "fips": "EK"
+  },
+  {
+    "code": "ER",
+    "name": "Eritrea",
+    "cameo": "ERI",
+    "fips": "ER"
+  },
+  {
+    "code": "SZ",
+    "name": "Eswatini",
+    "cameo": "SWZ",
+    "fips": "WZ"
+  },
+  {
+    "code": "ET",
+    "name": "Ethiopia",
+    "cameo": "ETH",
+    "fips": "ET"
+  },
+  {
+    "code": "GA",
+    "name": "Gabon",
+    "cameo": "GAB",
+    "fips": "GB"
+  },
+  {
+    "code": "GM",
+    "name": "Gambia",
+    "cameo": "GMB",
+    "fips": "GA"
+  },
+  {
+    "code": "GH",
+    "name": "Ghana",
+    "cameo": "GHA",
+    "fips": "GH"
+  },
+  {
+    "code": "GN",
+    "name": "Guinea",
+    "cameo": "GIN",
+    "fips": "GV"
+  },
+  {
+    "code": "GW",
+    "name": "Guinea-Bissau",
+    "cameo": "GNB",
+    "fips": "PU"
+  },
+  {
+    "code": "CI",
+    "name": "Ivory Coast",
+    "cameo": "CIV",
+    "fips": "IV"
+  },
+  {
+    "code": "KE",
+    "name": "Kenya",
+    "cameo": "KEN",
+    "fips": "KE"
+  },
+  {
+    "code": "LS",
+    "name": "Lesotho",
+    "cameo": "LSO",
+    "fips": "LT"
+  },
+  {
+    "code": "LR",
+    "name": "Liberia",
+    "cameo": "LBR",
+    "fips": "LI"
+  },
+  {
+    "code": "LY",
+    "name": "Libya",
+    "cameo": "LBY",
+    "fips": "LY"
+  },
+  {
+    "code": "MG",
+    "name": "Madagascar",
+    "cameo": "MDG",
+    "fips": "MA"
+  },
+  {
+    "code": "MW",
+    "name": "Malawi",
+    "cameo": "MWI",
+    "fips": "MI"
+  },
+  {
+    "code": "ML",
+    "name": "Mali",
+    "cameo": "MLI",
+    "fips": "ML"
+  },
+  {
+    "code": "MR",
+    "name": "Mauritania",
+    "cameo": "MRT",
+    "fips": "MR"
+  },
+  {
+    "code": "MU",
+    "name": "Mauritius",
+    "cameo": "MUS",
+    "fips": "MP"
+  },
+  {
+    "code": "MA",
+    "name": "Morocco",
+    "cameo": "MAR",
+    "fips": "MO"
+  },
+  {
+    "code": "MZ",
+    "name": "Mozambique",
+    "cameo": "MOZ",
+    "fips": "MZ"
+  },
+  {
+    "code": "NA",
+    "name": "Namibia",
+    "cameo": "NAM",
+    "fips": "WA"
+  },
+  {
+    "code": "NE",
+    "name": "Niger",
+    "cameo": "NER",
+    "fips": "NG"
+  },
+  {
+    "code": "NG",
+    "name": "Nigeria",
+    "cameo": "NGA",
+    "fips": "NI"
+  },
+  {
+    "code": "RW",
+    "name": "Rwanda",
+    "cameo": "RWA",
+    "fips": "RW"
+  },
+  {
+    "code": "ST",
+    "name": "São Tomé and Príncipe",
+    "cameo": "STP",
+    "fips": "TP"
+  },
+  {
+    "code": "SN",
+    "name": "Senegal",
+    "cameo": "SEN",
+    "fips": "SG"
+  },
+  {
+    "code": "SL",
+    "name": "Sierra Leone",
+    "cameo": "SLE",
+    "fips": "SL"
+  },
+  {
+    "code": "SO",
+    "name": "Somalia",
+    "cameo": "SOM",
+    "fips": "SO"
+  },
+  {
+    "code": "ZA",
+    "name": "South Africa",
+    "cameo": "ZAF",
+    "fips": "SF"
+  },
+  {
+    "code": "SS",
+    "name": "South Sudan",
+    "cameo": "SSD",
+    "fips": "OD"
+  },
+  {
+    "code": "SD",
+    "name": "Sudan",
+    "cameo": "SDN",
+    "fips": "SU"
+  },
+  {
+    "code": "TZ",
+    "name": "Tanzania",
+    "cameo": "TZA",
+    "fips": "TZ"
+  },
+  {
+    "code": "TG",
+    "name": "Togo",
+    "cameo": "TGO",
+    "fips": "TO"
+  },
+  {
+    "code": "TN",
+    "name": "Tunisia",
+    "cameo": "TUN",
+    "fips": "TS"
+  },
+  {
+    "code": "UG",
+    "name": "Uganda",
+    "cameo": "UGA",
+    "fips": "UG"
+  },
+  {
+    "code": "ZM",
+    "name": "Zambia",
+    "cameo": "ZMB",
+    "fips": "ZA"
+  },
+  {
+    "code": "ZW",
+    "name": "Zimbabwe",
+    "cameo": "ZWE",
+    "fips": "ZI"
+  },
+  {
+    "code": "AG",
+    "name": "Antigua and Barbuda",
+    "cameo": "ATG",
+    "fips": "AC"
+  },
+  {
+    "code": "AR",
+    "name": "Argentina",
+    "cameo": "ARG",
+    "fips": "AR"
+  },
+  {
+    "code": "BS",
+    "name": "Bahamas",
+    "cameo": "BHS",
+    "fips": "BF"
+  },
+  {
+    "code": "BB",
+    "name": "Barbados",
+    "cameo": "BRB",
+    "fips": "BB"
+  },
+  {
+    "code": "BZ",
+    "name": "Belize",
+    "cameo": "BLZ",
+    "fips": "BH"
+  },
+  {
+    "code": "BO",
+    "name": "Bolivia",
+    "cameo": "BOL",
+    "fips": "BL"
+  },
+  {
+    "code": "BR",
+    "name": "Brazil",
+    "cameo": "BRA",
+    "fips": "BR"
+  },
+  {
+    "code": "CA",
+    "name": "Canada",
+    "cameo": "CAN",
+    "fips": "CA"
+  },
+  {
+    "code": "CL",
+    "name": "Chile",
+    "cameo": "CHL",
+    "fips": "CI"
+  },
+  {
+    "code": "CO",
+    "name": "Colombia",
+    "cameo": "COL",
+    "fips": "CO"
+  },
+  {
+    "code": "CR",
+    "name": "Costa Rica",
+    "cameo": "CRI",
+    "fips": "CS"
+  },
+  {
+    "code": "CU",
+    "name": "Cuba",
+    "cameo": "CUB",
+    "fips": "CU"
+  },
+  {
+    "code": "DM",
+    "name": "Dominica",
+    "cameo": "DMA",
+    "fips": "DO"
+  },
+  {
+    "code": "DO",
+    "name": "Dominican Republic",
+    "cameo": "DOM",
+    "fips": "DR"
+  },
+  {
+    "code": "EC",
+    "name": "Ecuador",
+    "cameo": "ECU",
+    "fips": "EC"
+  },
+  {
+    "code": "SV",
+    "name": "El Salvador",
+    "cameo": "SLV",
+    "fips": "ES"
+  },
+  {
+    "code": "GD",
+    "name": "Grenada",
+    "cameo": "GRD",
+    "fips": "GJ"
+  },
+  {
+    "code": "GT",
+    "name": "Guatemala",
+    "cameo": "GTM",
+    "fips": "GT"
+  },
+  {
+    "code": "GY",
+    "name": "Guyana",
+    "cameo": "GUY",
+    "fips": "GY"
+  },
+  {
+    "code": "HT",
+    "name": "Haiti",
+    "cameo": "HTI",
+    "fips": "HA"
+  },
+  {
+    "code": "HN",
+    "name": "Honduras",
+    "cameo": "HND",
+    "fips": "HO"
+  },
+  {
+    "code": "JM",
+    "name": "Jamaica",
+    "cameo": "JAM",
+    "fips": "JM"
+  },
+  {
+    "code": "MX",
+    "name": "Mexico",
+    "cameo": "MEX",
+    "fips": "MX"
+  },
+  {
+    "code": "NI",
+    "name": "Nicaragua",
+    "cameo": "NIC",
+    "fips": "NU"
+  },
+  {
+    "code": "PA",
+    "name": "Panama",
+    "cameo": "PAN",
+    "fips": "PM"
+  },
+  {
+    "code": "PY",
+    "name": "Paraguay",
+    "cameo": "PRY",
+    "fips": "PA"
+  },
+  {
+    "code": "PE",
+    "name": "Peru",
+    "cameo": "PER",
+    "fips": "PE"
+  },
+  {
+    "code": "KN",
+    "name": "Saint Kitts and Nevis",
+    "cameo": "KNA",
+    "fips": "SC"
+  },
+  {
+    "code": "LC",
+    "name": "Saint Lucia",
+    "cameo": "LCA",
+    "fips": "ST"
+  },
+  {
+    "code": "VC",
+    "name": "Saint Vincent and the Grenadines",
+    "cameo": "VCT",
+    "fips": "VC"
+  },
+  {
+    "code": "SR",
+    "name": "Suriname",
+    "cameo": "SUR",
+    "fips": "NS"
+  },
+  {
+    "code": "TT",
+    "name": "Trinidad and Tobago",
+    "cameo": "TTO",
+    "fips": "TD"
+  },
+  {
+    "code": "US",
+    "name": "United States",
+    "cameo": "USA",
+    "fips": "US"
+  },
+  {
+    "code": "UY",
+    "name": "Uruguay",
+    "cameo": "URY",
+    "fips": "UY"
+  },
+  {
+    "code": "VE",
+    "name": "Venezuela",
+    "cameo": "VEN",
+    "fips": "VE"
+  },
+  {
+    "code": "AF",
+    "name": "Afghanistan",
+    "cameo": "AFG",
+    "fips": "AF"
+  },
+  {
+    "code": "AM",
+    "name": "Armenia",
+    "cameo": "ARM",
+    "fips": "AM"
+  },
+  {
+    "code": "AZ",
+    "name": "Azerbaijan",
+    "cameo": "AZE",
+    "fips": "AJ"
+  },
+  {
+    "code": "BH",
+    "name": "Bahrain",
+    "cameo": "BHR",
+    "fips": "BA"
+  },
+  {
+    "code": "BD",
+    "name": "Bangladesh",
+    "cameo": "BGD",
+    "fips": "BG"
+  },
+  {
+    "code": "BT",
+    "name": "Bhutan",
+    "cameo": "BTN",
+    "fips": "BT"
+  },
+  {
+    "code": "BN",
+    "name": "Brunei",
+    "cameo": "BRN",
+    "fips": "BX"
+  },
+  {
+    "code": "KH",
+    "name": "Cambodia",
+    "cameo": "KHM",
+    "fips": "CB"
+  },
+  {
+    "code": "CN",
+    "name": "China",
+    "cameo": "CHN",
+    "fips": "CH"
+  },
+  {
+    "code": "CY",
+    "name": "Cyprus",
+    "cameo": "CYP",
+    "fips": "CY"
+  },
+  {
+    "code": "GE",
+    "name": "Georgia",
+    "cameo": "GEO",
+    "fips": "GG"
+  },
+  {
+    "code": "IN",
+    "name": "India",
+    "cameo": "IND",
+    "fips": "IN"
+  },
+  {
+    "code": "ID",
+    "name": "Indonesia",
+    "cameo": "IDN",
+    "fips": "ID"
+  },
+  {
+    "code": "IR",
+    "name": "Iran",
+    "cameo": "IRN",
+    "fips": "IR"
+  },
+  {
+    "code": "IQ",
+    "name": "Iraq",
+    "cameo": "IRQ",
+    "fips": "IZ"
+  },
+  {
+    "code": "IL",
+    "name": "Israel",
+    "cameo": "ISR",
+    "fips": "IS"
+  },
+  {
+    "code": "JP",
+    "name": "Japan",
+    "cameo": "JPN",
+    "fips": "JA"
+  },
+  {
+    "code": "JO",
+    "name": "Jordan",
+    "cameo": "JOR",
+    "fips": "JO"
+  },
+  {
+    "code": "KZ",
+    "name": "Kazakhstan",
+    "cameo": "KAZ",
+    "fips": "KZ"
+  },
+  {
+    "code": "KW",
+    "name": "Kuwait",
+    "cameo": "KWT",
+    "fips": "KU"
+  },
+  {
+    "code": "KG",
+    "name": "Kyrgyzstan",
+    "cameo": "KGZ",
+    "fips": "KG"
+  },
+  {
+    "code": "LA",
+    "name": "Laos",
+    "cameo": "LAO",
+    "fips": "LA"
+  },
+  {
+    "code": "LB",
+    "name": "Lebanon",
+    "cameo": "LBN",
+    "fips": "LE"
+  },
+  {
+    "code": "MY",
+    "name": "Malaysia",
+    "cameo": "MYS",
+    "fips": "MY"
+  },
+  {
+    "code": "MV",
+    "name": "Maldives",
+    "cameo": "MDV",
+    "fips": "MV"
+  },
+  {
+    "code": "MN",
+    "name": "Mongolia",
+    "cameo": "MNG",
+    "fips": "MG"
+  },
+  {
+    "code": "MM",
+    "name": "Myanmar",
+    "cameo": "MMR",
+    "fips": "BM"
+  },
+  {
+    "code": "NP",
+    "name": "Nepal",
+    "cameo": "NPL",
+    "fips": "NP"
+  },
+  {
+    "code": "KP",
+    "name": "North Korea",
+    "cameo": "PRK",
+    "fips": "KN"
+  },
+  {
+    "code": "OM",
+    "name": "Oman",
+    "cameo": "OMN",
+    "fips": "MU"
+  },
+  {
+    "code": "PK",
+    "name": "Pakistan",
+    "cameo": "PAK",
+    "fips": "PK"
+  },
+  {
+    "code": "PS",
+    "name": "Palestine",
+    "cameo": "PSE",
+    "fips": "WE"
+  },
+  {
+    "code": "PH",
+    "name": "Philippines",
+    "cameo": "PHL",
+    "fips": "RP"
+  },
+  {
+    "code": "QA",
+    "name": "Qatar",
+    "cameo": "QAT",
+    "fips": "QA"
+  },
+  {
+    "code": "SA",
+    "name": "Saudi Arabia",
+    "cameo": "SAU",
+    "fips": "SA"
+  },
+  {
+    "code": "SG",
+    "name": "Singapore",
+    "cameo": "SGP",
+    "fips": "SN"
+  },
+  {
+    "code": "KR",
+    "name": "South Korea",
+    "cameo": "KOR",
+    "fips": "KS"
+  },
+  {
+    "code": "LK",
+    "name": "Sri Lanka",
+    "cameo": "LKA",
+    "fips": "CE"
+  },
+  {
+    "code": "SY",
+    "name": "Syria",
+    "cameo": "SYR",
+    "fips": "SY"
+  },
+  {
+    "code": "TW",
+    "name": "Taiwan",
+    "cameo": "TWN",
+    "fips": "TW"
+  },
+  {
+    "code": "TJ",
+    "name": "Tajikistan",
+    "cameo": "TJK",
+    "fips": "TI"
+  },
+  {
+    "code": "TH",
+    "name": "Thailand",
+    "cameo": "THA",
+    "fips": "TH"
+  },
+  {
+    "code": "TL",
+    "name": "Timor-Leste",
+    "cameo": "TLS",
+    "fips": "TT"
+  },
+  {
+    "code": "TR",
+    "name": "Turkey",
+    "cameo": "TUR",
+    "fips": "TU"
+  },
+  {
+    "code": "TM",
+    "name": "Turkmenistan",
+    "cameo": "TKM",
+    "fips": "TX"
+  },
+  {
+    "code": "AE",
+    "name": "United Arab Emirates",
+    "cameo": "ARE",
+    "fips": "AE"
+  },
+  {
+    "code": "UZ",
+    "name": "Uzbekistan",
+    "cameo": "UZB",
+    "fips": "UZ"
+  },
+  {
+    "code": "VN",
+    "name": "Vietnam",
+    "cameo": "VNM",
+    "fips": "VM"
+  },
+  {
+    "code": "YE",
+    "name": "Yemen",
+    "cameo": "YEM",
+    "fips": "YM"
+  },
+  {
+    "code": "AL",
+    "name": "Albania",
+    "cameo": "ALB",
+    "fips": "AL"
+  },
+  {
+    "code": "AD",
+    "name": "Andorra",
+    "cameo": "AND",
+    "fips": "AN"
+  },
+  {
+    "code": "AT",
+    "name": "Austria",
+    "cameo": "AUT",
+    "fips": "AU"
+  },
+  {
+    "code": "BY",
+    "name": "Belarus",
+    "cameo": "BLR",
+    "fips": "BO"
+  },
+  {
+    "code": "BE",
+    "name": "Belgium",
+    "cameo": "BEL",
+    "fips": "BE"
+  },
+  {
+    "code": "BA",
+    "name": "Bosnia and Herzegovina",
+    "cameo": "BIH",
+    "fips": "BK"
+  },
+  {
+    "code": "BG",
+    "name": "Bulgaria",
+    "cameo": "BGR",
+    "fips": "BU"
+  },
+  {
+    "code": "HR",
+    "name": "Croatia",
+    "cameo": "HRV",
+    "fips": "HR"
+  },
+  {
+    "code": "CZ",
+    "name": "Czech Republic",
+    "cameo": "CZE",
+    "fips": "EZ"
+  },
+  {
+    "code": "DK",
+    "name": "Denmark",
+    "cameo": "DNK",
+    "fips": "DA"
+  },
+  {
+    "code": "EE",
+    "name": "Estonia",
+    "cameo": "EST",
+    "fips": "EN"
+  },
+  {
+    "code": "FI",
+    "name": "Finland",
+    "cameo": "FIN",
+    "fips": "FI"
+  },
+  {
+    "code": "FR",
+    "name": "France",
+    "cameo": "FRA",
+    "fips": "FR"
+  },
+  {
+    "code": "DE",
+    "name": "Germany",
+    "cameo": "DEU",
+    "fips": "GM"
+  },
+  {
+    "code": "GR",
+    "name": "Greece",
+    "cameo": "GRC",
+    "fips": "GR"
+  },
+  {
+    "code": "HU",
+    "name": "Hungary",
+    "cameo": "HUN",
+    "fips": "HU"
+  },
+  {
+    "code": "IS",
+    "name": "Iceland",
+    "cameo": "ISL",
+    "fips": "IC"
+  },
+  {
+    "code": "IE",
+    "name": "Ireland",
+    "cameo": "IRL",
+    "fips": "EI"
+  },
+  {
+    "code": "IT",
+    "name": "Italy",
+    "cameo": "ITA",
+    "fips": "IT"
+  },
+  {
+    "code": "XK",
+    "name": "Kosovo",
+    "cameo": "XKX",
+    "fips": "KV"
+  },
+  {
+    "code": "LV",
+    "name": "Latvia",
+    "cameo": "LVA",
+    "fips": "LG"
+  },
+  {
+    "code": "LI",
+    "name": "Liechtenstein",
+    "cameo": "LIE",
+    "fips": "LS"
+  },
+  {
+    "code": "LT",
+    "name": "Lithuania",
+    "cameo": "LTU",
+    "fips": "LH"
+  },
+  {
+    "code": "LU",
+    "name": "Luxembourg",
+    "cameo": "LUX",
+    "fips": "LU"
+  },
+  {
+    "code": "MT",
+    "name": "Malta",
+    "cameo": "MLT",
+    "fips": "MT"
+  },
+  {
+    "code": "MD",
+    "name": "Moldova",
+    "cameo": "MDA",
+    "fips": "MD"
+  },
+  {
+    "code": "MC",
+    "name": "Monaco",
+    "cameo": "MCO",
+    "fips": "MN"
+  },
+  {
+    "code": "ME",
+    "name": "Montenegro",
+    "cameo": "MNE",
+    "fips": "MJ"
+  },
+  {
+    "code": "NL",
+    "name": "Netherlands",
+    "cameo": "NLD",
+    "fips": "NL"
+  },
+  {
+    "code": "MK",
+    "name": "North Macedonia",
+    "cameo": "MKD",
+    "fips": "MK"
+  },
+  {
+    "code": "NO",
+    "name": "Norway",
+    "cameo": "NOR",
+    "fips": "NO"
+  },
+  {
+    "code": "PL",
+    "name": "Poland",
+    "cameo": "POL",
+    "fips": "PL"
+  },
+  {
+    "code": "PT",
+    "name": "Portugal",
+    "cameo": "PRT",
+    "fips": "PO"
+  },
+  {
+    "code": "RO",
+    "name": "Romania",
+    "cameo": "ROU",
+    "fips": "RO"
+  },
+  {
+    "code": "RU",
+    "name": "Russia",
+    "cameo": "RUS",
+    "fips": "RS"
+  },
+  {
+    "code": "SM",
+    "name": "San Marino",
+    "cameo": "SMR",
+    "fips": "SM"
+  },
+  {
+    "code": "RS",
+    "name": "Serbia",
+    "cameo": "SRB",
+    "fips": "RI"
+  },
+  {
+    "code": "SK",
+    "name": "Slovakia",
+    "cameo": "SVK",
+    "fips": "LO"
+  },
+  {
+    "code": "SI",
+    "name": "Slovenia",
+    "cameo": "SVN",
+    "fips": "SI"
+  },
+  {
+    "code": "ES",
+    "name": "Spain",
+    "cameo": "ESP",
+    "fips": "SP"
+  },
+  {
+    "code": "SE",
+    "name": "Sweden",
+    "cameo": "SWE",
+    "fips": "SW"
+  },
+  {
+    "code": "CH",
+    "name": "Switzerland",
+    "cameo": "CHE",
+    "fips": "SZ"
+  },
+  {
+    "code": "UA",
+    "name": "Ukraine",
+    "cameo": "UKR",
+    "fips": "UP"
+  },
+  {
+    "code": "GB",
+    "name": "United Kingdom",
+    "cameo": "GBR",
+    "fips": "UK"
+  },
+  {
+    "code": "VA",
+    "name": "Vatican City",
+    "cameo": "VAT",
+    "fips": "VT"
+  },
+  {
+    "code": "AU",
+    "name": "Australia",
+    "cameo": "AUS",
+    "fips": "AS"
+  },
+  {
+    "code": "FJ",
+    "name": "Fiji",
+    "cameo": "FJI",
+    "fips": "FJ"
+  },
+  {
+    "code": "KI",
+    "name": "Kiribati",
+    "cameo": "KIR",
+    "fips": "KR"
+  },
+  {
+    "code": "MH",
+    "name": "Marshall Islands",
+    "cameo": "MHL",
+    "fips": "RM"
+  },
+  {
+    "code": "FM",
+    "name": "Micronesia",
+    "cameo": "FSM",
+    "fips": "FM"
+  },
+  {
+    "code": "NR",
+    "name": "Nauru",
+    "cameo": "NRU",
+    "fips": "NR"
+  },
+  {
+    "code": "NZ",
+    "name": "New Zealand",
+    "cameo": "NZL",
+    "fips": "NZ"
+  },
+  {
+    "code": "PW",
+    "name": "Palau",
+    "cameo": "PLW",
+    "fips": "PS"
+  },
+  {
+    "code": "PG",
+    "name": "Papua New Guinea",
+    "cameo": "PNG",
+    "fips": "PP"
+  },
+  {
+    "code": "WS",
+    "name": "Samoa",
+    "cameo": "WSM",
+    "fips": "WS"
+  },
+  {
+    "code": "SB",
+    "name": "Solomon Islands",
+    "cameo": "SLB",
+    "fips": "BP"
+  },
+  {
+    "code": "TO",
+    "name": "Tonga",
+    "cameo": "TON",
+    "fips": "TN"
+  },
+  {
+    "code": "TV",
+    "name": "Tuvalu",
+    "cameo": "TUV",
+    "fips": "TV"
+  },
+  {
+    "code": "VU",
+    "name": "Vanuatu",
+    "cameo": "VUT",
+    "fips": "NH"
+  },
+  {
+    "code": "PR",
+    "name": "Puerto Rico",
+    "cameo": "PRI",
+    "fips": "RQ"
+  },
+  {
+    "code": "GU",
+    "name": "Guam",
+    "cameo": "GUM",
+    "fips": "GQ"
+  },
+  {
+    "code": "VI",
+    "name": "US Virgin Islands",
+    "cameo": "VIR",
+    "fips": "VQ"
+  },
+  {
+    "code": "AS",
+    "name": "American Samoa",
+    "cameo": "ASM",
+    "fips": "AQ"
+  },
+  {
+    "code": "MP",
+    "name": "Northern Mariana Islands",
+    "cameo": "MNP",
+    "fips": "CQ"
+  },
+  {
+    "code": "GI",
+    "name": "Gibraltar",
+    "cameo": "GIB",
+    "fips": "GI"
+  },
+  {
+    "code": "BM",
+    "name": "Bermuda",
+    "cameo": "BMU",
+    "fips": "BD"
+  },
+  {
+    "code": "KY",
+    "name": "Cayman Islands",
+    "cameo": "CYM",
+    "fips": "CJ"
+  },
+  {
+    "code": "TC",
+    "name": "Turks and Caicos Islands",
+    "cameo": "TCA",
+    "fips": "TK"
+  },
+  {
+    "code": "VG",
+    "name": "British Virgin Islands",
+    "cameo": "VGB",
+    "fips": "VI"
+  },
+  {
+    "code": "AI",
+    "name": "Anguilla",
+    "cameo": "AIA",
+    "fips": "AV"
+  },
+  {
+    "code": "MS",
+    "name": "Montserrat",
+    "cameo": "MSR",
+    "fips": "MH"
+  },
+  {
+    "code": "FK",
+    "name": "Falkland Islands",
+    "cameo": "FLK",
+    "fips": "FK"
+  },
+  {
+    "code": "SH",
+    "name": "Saint Helena",
+    "cameo": "SHN",
+    "fips": "SH"
+  },
+  {
+    "code": "GF",
+    "name": "French Guiana",
+    "cameo": "GUF",
+    "fips": "FG"
+  },
+  {
+    "code": "GP",
+    "name": "Guadeloupe",
+    "cameo": "GLP",
+    "fips": "GP"
+  },
+  {
+    "code": "MQ",
+    "name": "Martinique",
+    "cameo": "MTQ",
+    "fips": "MB"
+  },
+  {
+    "code": "RE",
+    "name": "Réunion",
+    "cameo": "REU",
+    "fips": "RE"
+  },
+  {
+    "code": "YT",
+    "name": "Mayotte",
+    "cameo": "MYT",
+    "fips": "MF"
+  },
+  {
+    "code": "NC",
+    "name": "New Caledonia",
+    "cameo": "NCL",
+    "fips": "NC"
+  },
+  {
+    "code": "PF",
+    "name": "French Polynesia",
+    "cameo": "PYF",
+    "fips": "FP"
+  },
+  {
+    "code": "PM",
+    "name": "Saint Pierre and Miquelon",
+    "cameo": "SPM",
+    "fips": "SB"
+  },
+  {
+    "code": "WF",
+    "name": "Wallis and Futuna",
+    "cameo": "WLF",
+    "fips": "WF"
+  },
+  {
+    "code": "AW",
+    "name": "Aruba",
+    "cameo": "ABW",
+    "fips": "AA"
+  },
+  {
+    "code": "CW",
+    "name": "Curaçao",
+    "cameo": "CUW",
+    "fips": "UC"
+  },
+  {
+    "code": "SX",
+    "name": "Sint Maarten",
+    "cameo": "SXM",
+    "fips": "NN"
+  },
+  {
+    "code": "HK",
+    "name": "Hong Kong",
+    "cameo": "HKG",
+    "fips": "HK"
+  },
+  {
+    "code": "MO",
+    "name": "Macao",
+    "cameo": "MAC",
+    "fips": "MC"
+  },
+  {
+    "code": "EH",
+    "name": "Western Sahara",
+    "cameo": "ESH",
+    "fips": "WI"
+  },
+  {
+    "code": "TK",
+    "name": "Tokelau",
+    "cameo": "TKL",
+    "fips": "TL"
+  },
+  {
+    "code": "CK",
+    "name": "Cook Islands",
+    "cameo": "COK",
+    "fips": "CW"
+  },
+  {
+    "code": "NU",
+    "name": "Niue",
+    "cameo": "NIU",
+    "fips": "NE"
+  },
+  {
+    "code": "CC",
+    "name": "Cocos (Keeling) Islands",
+    "cameo": "CCK",
+    "fips": "CK"
+  },
+  {
+    "code": "CX",
+    "name": "Christmas Island",
+    "cameo": "CXR",
+    "fips": "KT"
+  },
+  {
+    "code": "NF",
+    "name": "Norfolk Island",
+    "cameo": "NFK",
+    "fips": "NF"
+  },
+  {
+    "code": "PN",
+    "name": "Pitcairn Islands",
+    "cameo": "PCN",
+    "fips": "PC"
+  },
+  {
+    "code": "GS",
+    "name": "South Georgia",
+    "cameo": "SGS",
+    "fips": "SX"
+  },
+  {
+    "code": "IO",
+    "name": "British Indian Ocean Terr.",
+    "cameo": "IOT",
+    "fips": "IO"
+  },
+  {
+    "code": "AQ",
+    "name": "Antarctica",
+    "cameo": "ATA",
+    "fips": "AY"
+  },
+  {
+    "code": "JE",
+    "name": "Jersey",
+    "cameo": "JEY",
+    "fips": "JE"
+  },
+  {
+    "code": "GG",
+    "name": "Guernsey",
+    "cameo": "GGY",
+    "fips": "GK"
+  },
+  {
+    "code": "IM",
+    "name": "Isle of Man",
+    "cameo": "IMN",
+    "fips": "IM"
+  }
+]

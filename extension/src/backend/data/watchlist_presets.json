@@ -1,0 +1,76 @@
+[
+  {
+    "bucket_name": "US\u2194Country interactions",
+    "lane": "events",
+    "logic": {
+      "require_us_actor": true,
+      "actor_country_filter": [],
+      "event_code_prefix": [],
+      "actor_type_filter": [],
+      "description": "Any coded event involving US and target-country actors",
+      "_categories": []
+    },
+    "enabled": true
+  },
+  {
+    "bucket_name": "Transfer agreements / returns / removals",
+    "lane": "events",
+    "logic": {
+      "require_us_actor": true,
+      "actor_country_filter": [],
+      "event_code_prefix": ["036", "046", "057", "061", "071", "111", "172", "173"],
+      "actor_type_filter": [],
+      "description": "Cooperation, negotiation, and expulsion event codes",
+      "_categories": ["agreements_cooperation", "detention_deportation"]
+    },
+    "enabled": true
+  },
+  {
+    "bucket_name": "Legal challenge / injunction / court",
+    "lane": "doc",
+    "logic": {
+      "query": "(injunction OR \"court order\" OR \"legal challenge\" OR \"federal court\" OR ruling) AND (immigration OR deportation OR removal OR asylum OR migrant)",
+      "description": "Legal proceedings and court actions on immigration enforcement",
+      "_builder_state": {
+        "required": ["immigration"],
+        "optional": ["injunction", "court order", "legal challenge", "federal court", "ruling"],
+        "excluded": [],
+        "themes": [],
+        "lang": "eng"
+      }
+    },
+    "enabled": true
+  },
+  {
+    "bucket_name": "Complaint / rights commission / NGO allegations",
+    "lane": "doc",
+    "logic": {
+      "query": "(complaint OR allegation OR \"human rights\" OR NGO OR ombudsman OR ACLU OR UNHCR OR \"rights commission\") AND (deportation OR removal OR detention OR immigration OR migrant)",
+      "description": "Civil society and oversight body concerns",
+      "_builder_state": {
+        "required": [],
+        "optional": ["complaint", "allegation", "human rights", "NGO", "ACLU", "UNHCR"],
+        "excluded": [],
+        "themes": ["HUMAN_RIGHTS"],
+        "lang": "eng"
+      }
+    },
+    "enabled": true
+  },
+  {
+    "bucket_name": "Detention / deportation flight / logistics",
+    "lane": "doc",
+    "logic": {
+      "query": "\"deportation flight\" OR \"removal flight\" OR \"detention center\" OR \"immigration detention\" OR \"mass deportation\" OR \"repatriation flight\" OR \"ICE flight\" OR \"deportation charter\"",
+      "description": "Operational details: detention facilities, flights, logistics",
+      "_builder_state": {
+        "required": [],
+        "optional": ["deportation flight", "removal flight", "detention center", "immigration detention", "mass deportation", "repatriation flight"],
+        "excluded": [],
+        "themes": [],
+        "lang": "eng"
+      }
+    },
+    "enabled": true
+  }
+]

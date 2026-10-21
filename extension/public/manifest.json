@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "Canary",
+  "version": "0.3.0",
+  "description": "Collect and triage GDELT, news, social, and Media Cloud results for your projects, stored in this browser.",
+  "icons": { "128": "canary.png" },
+  "action": { "default_title": "Open Canary", "default_icon": "canary.png" },
+  "background": { "service_worker": "background.js" },
+  "content_security_policy": { "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'" },
+  "permissions": ["alarms", "offscreen", "unlimitedStorage", "downloads", "downloads.open", "pageCapture", "scripting"],
+  "host_permissions": [
+    "https://data.gdeltproject.org/*",
+    "https://news.google.com/*",
+    "https://search.mediacloud.org/*",
+    "https://script.google.com/*",
+    "https://script.googleusercontent.com/*"
+  ],
+  "optional_host_permissions": ["https://*/*", "http://*/*", "https://huggingface.co/*", "https://*.hf.co/*"]
+}
