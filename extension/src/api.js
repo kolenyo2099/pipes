@@ -6,7 +6,8 @@
 import * as store from './backend/store.js'
 import { ontology, searchThemes } from './backend/ontology.js'
 import { runProjectNow, channel, BUDGETS, budgetUsed, BROKEN_LANES } from './backend/collect.js'
-import { sendToSheet } from './backend/sheets.js'
+import { buildSheetRow } from './backend/sheets.js'
+import { getTeam, setTeam } from './backend/team.js'
 import { validateToken, collectionSearch, configuredToken, TOKEN_SETTING } from './backend/mediacloud.js'
 import { BLUESKY_ACCOUNT, blueskySignIn } from './backend/bluesky.js'
 import { archiveItem, archiveBatch, openSnapshot, openArchivesFolder } from './backend/archive.js'
@@ -27,11 +28,27 @@ async function call(fn) {
 const orNotFound = (message) => value => { if (value === null || value === false) throw new HttpError(404, message); return value }
 
 async function sendItemToSheet(projectId, itemId) {
-  const project = orNotFound('Project not found')(await store.getProject(projectId) || null)
   const item = orNotFound('Item not found')(await store.getItem(projectId, itemId))
-  if (!project.sheet_sink) throw new HttpError(400, 'No sheet sink configured for this project')
-  const [ok, error] = await sendToSheet(item, project.sheet_sink)
-  return store.setSheetStatus(projectId, itemId, ok, error)
+  if (!await getTeam()) throw new HttpError(400, 'Join your team in Project Settings first')
+  const reply = await chrome.runtime.sendMessage({ type: 'pipeline:save', item: { kind: 'canary', ref: item.item_id, ...buildSheetRow(item) } })
+  if (!reply?.ok) throw new HttpError(500, reply?.error || 'The save queue did not respond')
+  // Delivery happens in the service worker; the result comes back through reconcileSheetResults.
+  return store.markSheetPending(projectId, itemId)
+}
+
+// Moves items waiting on the team sheet to sent/failed using what the outbox has delivered so far.
+async function reconcileSheets() {
+  if (!inExtension) return 0
+  return store.reconcileSheetResults((await chrome.storage.local.get('pipelineResults')).pipelineResults || {})
+}
+
+async function checkTeam() {
+  const team = await getTeam()
+  if (!team) throw new HttpError(400, 'Join your team first')
+  const response = await fetch(team.url, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ token: team.token, action: 'health' }) })
+  const reply = await response.json().catch(() => ({}))
+  if (!response.ok || reply.ok === false) throw new Error(reply.error || `HTTP ${response.status}`)
+  return { item_count: reply.item_count }
 }
 
 // In the extension, collection runs in the offscreen document so it continues when this tab closes.
@@ -87,10 +104,9 @@ export const api = {
   listItems: (projectId, params = {}) => call(() => store.listItems(projectId, params)),
   saveItem: (projectId, itemId, data) => call(async () => {
     const before = orNotFound('Item not found')(await store.getItem(projectId, itemId))
-    const saved = await store.saveItem(projectId, itemId, data)
+    const saved = await store.saveItem(projectId, itemId, { ...data, saved_by: data.saved_by || (await getTeam())?.name })
     // Auto-send only on the first save (inbox → saved), not when tags are edited later.
-    const project = await store.getProject(projectId)
-    if (before.status === 'inbox' && project?.sheet_sink?.auto_send_on_save) return sendItemToSheet(projectId, itemId)
+    if (before.status === 'inbox' && await getTeam()) return sendItemToSheet(projectId, itemId)
     return saved
   }),
   deleteItem: (projectId, itemId) => call(async () => { orNotFound('Item not found')(await store.deleteItem(projectId, itemId)) }),
@@ -107,8 +123,8 @@ export const api = {
     const failed = await store.failedSheetItems(projectId)
     const results = []
     for (const item of failed) {
-      const updated = await sendItemToSheet(projectId, item.item_id)
-      results.push({ item_id: item.item_id, success: updated.sheet_send_status === 'sent', error: updated.sheet_last_error })
+      await sendItemToSheet(projectId, item.item_id)
+      results.push({ item_id: item.item_id, success: true })
     }
     return { retried: results.length, results }
   }),
@@ -200,6 +216,11 @@ export const api = {
   clearTelegramAccount: () => call(() => telegramControl('clear')),
 
   // Shared browser NLP models; inference stays in the offscreen collector.
+  reconcileSheets: () => call(reconcileSheets),
+  getTeamStatus: () => call(async () => ({ team: await getTeam(), outbox: await chrome.runtime.sendMessage({ type: 'pipeline:status' }) })),
+  saveTeam: data => call(() => setTeam(data)),
+  checkTeam: () => call(checkTeam),
+  retryOutbox: () => call(() => chrome.runtime.sendMessage({ type: 'pipeline:retry' })),
   getNlpStatus: () => call(nlpStatus),
   installNlpModel: pack => {
     const permission = inExtension ? chrome.permissions.request({ origins: ['https://huggingface.co/*', 'https://*.hf.co/*'] }) : Promise.resolve(true)

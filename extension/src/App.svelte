@@ -13,7 +13,7 @@
   import Timeline from './views/Timeline.svelte'
   import {
     currentView, currentProjectId, currentProject,
-    projects, isLoading, ontology, notification, filters, clearFilters,
+    projects, stats, isLoading, ontology, notification, filters, clearFilters,
   } from './stores/app.js'
 
   // Keep shared filters visible and reversible even when their originating
@@ -65,8 +65,19 @@
     currentProject.set(null)
   }
 
+  // The service worker delivers saves to the team sheet after the app page may have moved on; settle their status here.
+  async function settleSheets() {
+    if (!(await api.reconcileSheets()).data || !$currentProjectId) return
+    const stat = await api.getProjectStats($currentProjectId)
+    if (stat.ok) stats.set(stat.data)
+    filters.update(f => ({ ...f }))
+  }
+
   onMount(() => {
-    boot()
+    boot().then(() => settleSheets())
+    const onMessage = message => { if (message?.type === 'pipeline:delivered') settleSheets() }
+    globalThis.chrome?.runtime?.onMessage?.addListener(onMessage)
+    return () => globalThis.chrome?.runtime?.onMessage?.removeListener(onMessage)
   })
 </script>
 

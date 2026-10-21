@@ -35,7 +35,6 @@ const baseProject = {
     overlap_minutes: 15,
   },
   mediacloud_collections: [collectionA],
-  sheet_sink: null,
 }
 
 function json(data) {

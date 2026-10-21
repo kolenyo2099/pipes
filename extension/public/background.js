@@ -1,3 +1,4 @@
+importScripts('outbox.js', 'capture-bg.js')
 // Canary service worker: opens the app, and keeps collection running on a one-minute alarm.
 // The collectors themselves run in an offscreen document (see src/offscreen.js).
 const ensureAlarm = () => chrome.alarms.create('collect', { periodInMinutes: 1 })

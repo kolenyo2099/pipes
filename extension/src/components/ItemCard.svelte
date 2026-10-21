@@ -206,7 +206,9 @@
     sendingSheet = false
     if (result.ok) {
       const status = result.data.sheet_send_status
-      if (status === 'sent') {
+      if (status === 'pending') {
+        notify('info', 'Queued for the team sheet')
+      } else if (status === 'sent') {
         notify('success', 'Sent to Google Sheet')
       } else {
         notify('error', `Sheet send failed: ${result.data.sheet_last_error || 'unknown'}`)

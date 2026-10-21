@@ -3,6 +3,7 @@
 import { get, put, del, all, byIndex, putMany, delMany, projectItems, getMeta, putMeta, tx } from './db.js'
 import { storyAssigner, sourceDomain } from './grouping.js'
 import { removeArchiveFiles } from './archiveFiles.js'
+import { getTeam } from './team.js'
 
 export const now = () => new Date().toISOString()
 const uuid = () => crypto.randomUUID()
@@ -32,7 +33,7 @@ export async function createProject(data) {
   const project = {
     project_id: uuid(), name: data.name, countries_focus: data.countries_focus, watchlists: dedupeWatchlists(data.watchlists),
     polling_config: { ...DEFAULT_POLLING, ...data.polling_config }, mediacloud_collections: data.mediacloud_collections || [],
-    sheet_sink: data.sheet_sink || null, created_at: created, collecting_since: data.collecting_since || created,
+    created_at: created, collecting_since: data.collecting_since || created,
     last_events_url: null, last_events_translation_url: null, last_events_collected_at: null, last_doc_collected_at: null,
     last_doc_translation_collected_at: null, last_doc_polled_at: null, last_rss_collected_at: null, last_mediacloud_collected_at: null,
     last_x_collected_at: null, last_bluesky_collected_at: null, last_telegram_collected_at: null, rss_cursors: {}, x_cursors: {}, bluesky_cursors: {},
@@ -51,8 +52,6 @@ export async function updateProject(id, data) {
   // Projects saved before a lane existed have no settings for it.
   if (data.polling_config != null) project.polling_config = { ...DEFAULT_POLLING, ...data.polling_config }
   if (data.watchlists) project.watchlists = dedupeWatchlists(data.watchlists)
-  if (data.clear_sheet_sink) project.sheet_sink = null
-  else if (data.sheet_sink) project.sheet_sink = data.sheet_sink
   await put('projects', project)
   return project
 }
@@ -90,7 +89,8 @@ export async function itemUpserter(projectId) {
   const meta = await getMeta(projectId)
   const candidates = []
   const assign = storyAssigner(existing, { constraints: meta.group_constraints || [], onCandidate: edge => candidates.push(edge) })
-  return async (items, hasSheet) => {
+  const hasTeam = !!await getTeam()
+  return async items => {
     const changed = new Map(), fresh = []
     for (const incoming of items) {
       const current = changed.get(incoming.item_id) || known.get(incoming.item_id)
@@ -101,7 +101,7 @@ export async function itemUpserter(projectId) {
         continue
       }
       const item = { ...incoming, matched_buckets: incoming.query_bucket ? [incoming.query_bucket] : [], status: 'inbox',
-        saved_by: null, saved_at: null, tags: [], notes: null, sheet_send_status: hasSheet ? 'pending' : 'not_configured',
+        saved_by: null, saved_at: null, tags: [], notes: null, sheet_send_status: hasTeam ? 'pending' : 'not_configured',
         sheet_sent_at: null, sheet_last_error: null, created_at: now() }
       item.story_key = assign(item)
       changed.set(item.item_id, item)
@@ -235,8 +235,17 @@ export const saveItem = (projectId, itemId, req) => setItem(projectId, itemId, {
   status: 'saved', saved_by: req.saved_by || 'investigator', saved_at: now(), tags: req.tags || [], notes: req.notes ?? '' })
 export const dismissItem = (projectId, itemId) => setItem(projectId, itemId, { status: 'dismissed' })
 export const undismissItem = (projectId, itemId) => setItem(projectId, itemId, { status: 'inbox' })
-export const setSheetStatus = (projectId, itemId, ok, error) => setItem(projectId, itemId, {
-  sheet_send_status: ok ? 'sent' : 'failed', sheet_sent_at: ok ? now() : null, sheet_last_error: error || null })
+export const markSheetPending = (projectId, itemId) => setItem(projectId, itemId, { sheet_send_status: 'pending', sheet_last_error: null })
+
+// Applies the outbox's delivery results (ref → {ok, error}) to items still waiting on the team sheet.
+export async function reconcileSheetResults(results) {
+  const waiting = (await all('items')).filter(i => i.sheet_send_status === 'pending' && results[i.item_id])
+  await putMany('items', waiting.map(i => {
+    const { ok, error } = results[i.item_id]
+    return { ...i, sheet_send_status: ok ? 'sent' : 'failed', sheet_sent_at: ok ? now() : null, sheet_last_error: ok ? null : error || 'Failed' }
+  }))
+  return waiting.length
+}
 
 export async function deleteItem(projectId, itemId) {
   if (!await getItem(projectId, itemId)) return false

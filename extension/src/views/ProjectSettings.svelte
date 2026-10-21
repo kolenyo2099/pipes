@@ -1,5 +1,6 @@
 <script>
   import NlpSettings from '../components/NlpSettings.svelte'
+  import TeamSettings from '../components/TeamSettings.svelte'
   import { onMount } from 'svelte'
   import { api } from '../api.js'
   import {
@@ -13,10 +14,6 @@
   } from '../lib/mediacloudRules.js'
 
   let name = ''
-  let sheetUrl = ''
-  let sheetToken = ''
-  let sheetPageUrl = ''
-  let autoSend = true
   let eventsEnabled = true
   let docEnabled = false
   let rssEnabled = false
@@ -35,79 +32,6 @@
   let xBudget = 20
   let blueskyBudget = 300
   let telegramBudget = 60
-  let scriptCopied = false
-
-  // Apps Script that users paste into their Google Sheet's bound script editor.
-  // Uses getActiveSpreadsheet() — works automatically when created from
-  // Extensions → Apps Script inside the sheet (container-bound, no ID needed).
-  const APPS_SCRIPT = `// canary-script-version: 4
-var CANARY_VERSION = '4';
-
-// Visit the web app URL in a browser to confirm which version is deployed.
-function doGet() {
-  return ContentService.createTextOutput('canary-script-version: ' + CANARY_VERSION)
-    .setMimeType(ContentService.MimeType.TEXT);
-}
-
-function doPost(e) {
-  var SHEET_NAME = 'canary'; // tab name — created automatically if missing
-  var step = 'init';
-
-  var lock = LockService.getScriptLock();
-  lock.waitLock(10000);
-  try {
-    step = 'read-body';
-    var raw = e.postData.contents;
-    Logger.log('canary v' + CANARY_VERSION + ' | step=' + step + ' | raw=' + raw.substring(0, 300));
-
-    step = 'parse-json';
-    var data = JSON.parse(raw);
-
-    step = 'check-token';
-    var token = PropertiesService.getScriptProperties().getProperty('TOKEN');
-    if (token && data.token !== token) {
-      return ContentService.createTextOutput('Unauthorized')
-        .setMimeType(ContentService.MimeType.TEXT);
-    }
-
-    step = 'extract-arrays';
-    var headers = data.headers; // ordered column names sent by Canary
-    var values  = data.values;  // ordered values — same index as headers
-    if (!headers || !values || headers.length !== values.length) {
-      return ContentService.createTextOutput(
-        'ERROR: malformed payload — headers(' + (headers ? headers.length : 'null') +
-        ') values(' + (values ? values.length : 'null') + ')'
-      ).setMimeType(ContentService.MimeType.TEXT);
-    }
-
-    step = 'get-sheet';
-    var ss    = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = ss.getSheetByName(SHEET_NAME) || ss.insertSheet(SHEET_NAME);
-
-    step = 'append-header';
-    if (sheet.getLastRow() === 0) sheet.appendRow(headers);
-
-    step = 'append-values';
-    // Coerce any residual null/undefined cells to empty string to be safe.
-    var safeValues = values.map(function(v) { return v == null ? '' : v; });
-    sheet.appendRow(safeValues);
-
-    return ContentService.createTextOutput('OK')
-      .setMimeType(ContentService.MimeType.TEXT);
-  } catch (err) {
-    Logger.log('canary v' + CANARY_VERSION + ' | FAILED at step=' + step + ' | ' + err.message);
-    return ContentService.createTextOutput('ERROR: [' + step + '] ' + err.message)
-      .setMimeType(ContentService.MimeType.TEXT);
-  } finally {
-    lock.releaseLock();
-  }
-}`
-
-  async function copyScript() {
-    await navigator.clipboard.writeText(APPS_SCRIPT)
-    scriptCopied = true
-    setTimeout(() => scriptCopied = false, 2000)
-  }
 
   let saving = false
   let deleting = false
@@ -248,10 +172,6 @@ function doPost(e) {
     xInterval = project.polling_config?.x_interval_minutes ?? 60
     blueskyInterval = project.polling_config?.bluesky_interval_minutes ?? 60
     telegramInterval = project.polling_config?.telegram_interval_minutes ?? 60
-    sheetUrl = project.sheet_sink?.url || ''
-    sheetToken = project.sheet_sink?.token || ''
-    sheetPageUrl = project.sheet_sink?.sheet_url || ''
-    autoSend = project.sheet_sink?.auto_send_on_save ?? true
   }
 
   // ── Headline enrichment (GDELT events carry generated titles) ─────────────
@@ -472,18 +392,6 @@ function doPost(e) {
         overlap_minutes: 15,
       },
       mediacloud_collections: mediacloudCollections,
-    }
-    if (sheetUrl.trim()) {
-      data.sheet_sink = {
-        url: sheetUrl.trim(),
-        token: sheetToken.trim() || null,
-        auto_send_on_save: autoSend,
-        sheet_url: sheetPageUrl.trim() || null,
-      }
-    } else {
-      // Explicitly clear the sink — sending null would be indistinguishable
-      // from "omit / no change" due to how serde deserialises Option<T>.
-      data.clear_sheet_sink = true
     }
     return data
   }
@@ -808,79 +716,7 @@ function doPost(e) {
     </div>
   </section>
 
-  <!-- Sheets -->
-  <section class="step">
-    <h2 class="step-title">Google Sheets sink</h2>
-    <p class="step-hint">Push saved items to a Google Sheet automatically. Takes 2 minutes to set up — no spreadsheet ID needed.</p>
-
-    <!-- Setup steps (collapsed once URL is filled in) -->
-    {#if !sheetUrl.trim()}
-      <div class="sheet-setup">
-        <div class="setup-step">
-          <span class="step-num">1</span>
-          <div class="step-body">
-            <strong>Open your Google Sheet</strong>, then go to
-            <strong>Extensions → Apps Script</strong>.
-            This creates a script that is automatically linked to that sheet —
-            no IDs to copy.
-          </div>
-        </div>
-        <div class="setup-step">
-          <span class="step-num">2</span>
-          <div class="step-body">
-            <strong>Replace any existing code</strong> with the script below, then save (⌘S / Ctrl+S).
-            <div class="script-block">
-              <pre class="script-pre">{APPS_SCRIPT}</pre>
-              <button class="btn-copy-script" on:click={copyScript}>
-                {scriptCopied ? '✓ Copied!' : 'Copy script'}
-              </button>
-            </div>
-          </div>
-        </div>
-        <div class="setup-step">
-          <span class="step-num">3</span>
-          <div class="step-body">
-            Click <strong>Deploy → New deployment</strong>.
-            Set type to <em>Web app</em>, execute as <em>Me</em>,
-            and access to <strong>Anyone</strong> (not "Anyone with a Google account").
-            Click <strong>Deploy</strong> and authorise when prompted.
-          </div>
-        </div>
-        <div class="setup-step">
-          <span class="step-num">4</span>
-          <div class="step-body">
-            Copy the <strong>Web app URL</strong> and paste it below.
-            A new tab named <em>canary</em> will be created in your sheet automatically.
-          </div>
-        </div>
-      </div>
-    {/if}
-
-    <div class="form-group">
-      <label for="s-url">Web app URL</label>
-      <input id="s-url" type="url" class="form-input form-input--wide"
-        placeholder="https://script.google.com/macros/s/…/exec"
-        bind:value={sheetUrl} />
-    </div>
-    <div class="form-group">
-      <label for="s-token">
-        Token <span class="hint">(optional — set via Script Properties in Apps Script)</span>
-      </label>
-      <input id="s-token" type="text" class="form-input" placeholder="shared-secret" bind:value={sheetToken} />
-    </div>
-    <div class="form-group">
-      <label for="s-page-url">
-        Spreadsheet URL <span class="hint">(optional — enables the "Open spreadsheet" button)</span>
-      </label>
-      <input id="s-page-url" type="url" class="form-input form-input--wide"
-        placeholder="https://docs.google.com/spreadsheets/d/…/edit"
-        bind:value={sheetPageUrl} />
-    </div>
-    <label class="toggle-label">
-      <input type="checkbox" bind:checked={autoSend} />
-      Auto-send on save
-    </label>
-  </section>
+  <TeamSettings />
 
   <NlpSettings />
 
@@ -1070,77 +906,4 @@ function doPost(e) {
   .btn-confirm-delete:hover { background: #b91c1c; }
   .btn-confirm-delete:disabled { opacity: 0.6; cursor: default; }
 
-  /* ── Sheet setup guide ────────────────────────────────────────────────────── */
-  .sheet-setup {
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-    margin-bottom: 1.25rem;
-    overflow: hidden;
-  }
-  .setup-step {
-    align-items: flex-start;
-    border-bottom: 1px solid var(--border-light, var(--paper-2));
-    display: flex;
-    gap: 0.85rem;
-    padding: 0.85rem 1rem;
-  }
-  .setup-step:last-child { border-bottom: none; }
-  .step-num {
-    align-items: center;
-    background: var(--accent);
-    border-radius: 50%;
-    color: white;
-    display: flex;
-    flex-shrink: 0;
-    font-size: 0.7rem;
-    font-weight: 700;
-    height: 20px;
-    justify-content: center;
-    margin-top: 1px;
-    width: 20px;
-  }
-  .step-body {
-    color: var(--text);
-    font-size: 0.82rem;
-    line-height: 1.5;
-  }
-  .step-body strong { color: var(--text); }
-  .step-body em { font-style: normal; color: var(--text-muted); }
-
-  .script-block {
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    margin-top: 0.6rem;
-    overflow: hidden;
-    position: relative;
-  }
-  .script-pre {
-    background: #1e1e2e;
-    color: #cdd6f4;
-    font-family: 'SF Mono', 'Fira Code', monospace;
-    font-size: 0.68rem;
-    line-height: 1.5;
-    margin: 0;
-    max-height: 180px;
-    overflow-y: auto;
-    padding: 0.75rem 1rem;
-    scrollbar-width: thin;
-    white-space: pre;
-  }
-  .btn-copy-script {
-    background: rgba(255,255,255,0.08);
-    border: none;
-    border-top: 1px solid rgba(255,255,255,0.1);
-    color: var(--muted-2);
-    cursor: pointer;
-    font-size: 0.72rem;
-    padding: 0.35rem 0.75rem;
-    text-align: right;
-    transition: background 0.12s, color 0.12s;
-    width: 100%;
-  }
-  .btn-copy-script:hover { background: rgba(255,255,255,0.14); color: var(--line); }
 </style>

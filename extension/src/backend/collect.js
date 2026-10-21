@@ -115,7 +115,7 @@ async function collectGdelt(kind, project, log, signal) {
       // GDELT stamps rows with their export's quarter-hour time, so use the
       // floored project start while still excluding older exports.
       const items = await parse({ kind, project, start: plan.start, end: new Date(Date.now() + 86_400_000).toISOString(), stream }, buffer)
-      fresh.push(...await upsert(items, !!project.sheet_sink))
+      fresh.push(...await upsert(items))
       log.fetch_count += items.length
       log.new_count = fresh.length
       await patchProject(project.project_id, { ...save(url), ...(urlTime(url) === plan.firstMs ? { [plan.replayField]: true } : {}) })
@@ -196,7 +196,7 @@ async function collectRss(project, log, signal) {
         const items = candidates.filter(item => simpleFilterPasses(rule.logic, item.title_or_summary,
           [item.snippet_or_context, item.normalized?.description_text].filter(Boolean).join(' '), item.normalized))
         log.fetch_count += items.length
-        log.new_count += (await upsert(items, !!project.sheet_sink)).length
+        log.new_count += (await upsert(items)).length
         await saveLogProgress(log)
       }
       cursors[rule.bucket_name] = window.end
@@ -218,7 +218,7 @@ export async function collectMediaCloud(project, log, signal) {
   const upsert = await itemUpserter(project.project_id)
   log.checked_count = 1
   log.fetch_count = items.length
-  log.new_count = (await upsert(accepted, !!project.sheet_sink)).length
+  log.new_count = (await upsert(accepted)).length
   // Preserve the search window on partial failures so the next run retries it.
   signal?.throwIfAborted()
   if (!error) await patchProject(project.project_id, { last_mediacloud_collected_at: now() })
@@ -413,7 +413,7 @@ async function collectSocial(lane, project, log, signal) {
     const kept = keep ? fresh.filter(item => keep(rule, item)) : fresh
     await enrichItems(kept, signal)
     log.fetch_count += kept.length
-    log.new_count += (await upsert(kept, !!project.sheet_sink)).length
+    log.new_count += (await upsert(kept)).length
     await patchProject(project.project_id, { [`${lane}_cursors`]: cursors })
     await saveLogProgress(log)
   }

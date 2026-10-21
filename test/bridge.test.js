@@ -183,6 +183,20 @@ test('URL dedupe on extension paths merges Saved By without duplicates', () => {
   assert.equal(b.cell(1, 'Source Type'), 'chrome-extension');
   assert.equal(b.cell(1, 'Notes'), '');
   assert.equal(b.cell(1, 'Source'), 'chrome-extension');
+  assert.equal(b.cell(1, 'Extra'), '');
+});
+
+test('extension capture maps language/date/project and keeps site fields in Extra', () => {
+  const b = load();
+  b.post({ action: 'data', sheetName: 'Archive', capture: {
+    url: 'https://x.com/a/status/1', sourceType: 'x', project: 'P1', language: 'en',
+    publishDate: '2026-02-03', tweetId: '1', authorUsername: 'a', snippet: ''
+  } });
+  assert.equal(b.cell(1, 'Source Type'), 'x');
+  assert.equal(b.cell(1, 'Project'), 'P1');
+  assert.equal(b.cell(1, 'Language'), 'en');
+  assert.equal(b.cell(1, 'Published At'), '2026-02-03');
+  assert.deepEqual(JSON.parse(b.cell(1, 'Extra')), { tweetId: '1', authorUsername: 'a' });
 });
 
 test('legacy no-action extension post appends the 7 column row off Archive and goes to Archive when asked', () => {

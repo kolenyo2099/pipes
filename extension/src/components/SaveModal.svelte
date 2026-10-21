@@ -1,6 +1,7 @@
 <script>
   import { createEventDispatcher, onMount } from 'svelte'
   import { api } from '../api.js'
+  import { getTeam } from '../backend/team.js'
   import { notify, currentProjectId } from '../stores/app.js'
 
   export let item = null
@@ -18,10 +19,10 @@
   // Use onMount (not $: reactive) so that form state is only initialised once
   // when the modal opens. A reactive $: block re-runs during Svelte's update
   // flush and resets the values while the user is typing.
-  onMount(() => {
+  onMount(async () => {
     tagsInput = (item?.tags || []).join(', ')
     notes = item?.notes || ''
-    savedBy = item?.saved_by || 'investigator'
+    savedBy = item?.saved_by || (await getTeam())?.name || 'investigator'
   })
 
   function parseTags(input) {

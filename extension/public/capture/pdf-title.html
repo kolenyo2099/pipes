@@ -1,0 +1,67 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Save PDF to team sheet</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 18px;
+      font-family: system-ui, sans-serif;
+      color: #202124;
+      background: #fff;
+    }
+    h1 {
+      margin: 0 0 12px;
+      font-size: 16px;
+      font-weight: 600;
+    }
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 13px;
+      color: #3c4043;
+    }
+    input {
+      box-sizing: border-box;
+      width: 100%;
+      padding: 9px 10px;
+      border: 1px solid #dadce0;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+    .actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 16px;
+    }
+    button {
+      border: 1px solid #dadce0;
+      border-radius: 6px;
+      padding: 8px 12px;
+      background: #fff;
+      color: #202124;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    button[type="submit"] {
+      border-color: #1a73e8;
+      background: #1a73e8;
+      color: #fff;
+    }
+  </style>
+</head>
+<body>
+  <h1>Save PDF to team sheet</h1>
+  <form id="titleForm">
+    <label for="titleInput">Title</label>
+    <input id="titleInput" type="text" autocomplete="off" required autofocus>
+    <div class="actions">
+      <button id="cancelBtn" type="button">Cancel</button>
+      <button type="submit">Save</button>
+    </div>
+  </form>
+  <script src="pdf-title.js"></script>
+</body>
+</html>

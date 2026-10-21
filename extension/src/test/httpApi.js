@@ -94,6 +94,8 @@ export const api = {
     request('POST', `/projects/${projectId}/items/dismiss-filtered`, params),
   getGkgCountTypes: (projectId) =>
     request('GET', `/projects/${projectId}/items/gkg-count-types`),
+  reconcileSheets: async () => ({ ok: true, data: 0 }),
+  getTeamStatus: async () => ({ ok: true, data: { team: null, outbox: { pending: 0, parked: 0, lastError: '', team: { configured: false } } } }),
   sendToSheet: (projectId, itemId) =>
     request('POST', `/projects/${projectId}/items/${itemId}/send_to_sheet`),
   retryFailedSheets: (projectId) =>

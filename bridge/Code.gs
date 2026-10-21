@@ -321,8 +321,24 @@ function extensionArchiveItem(rowData, capture, body) {
     "Saved At": capture.timestamp || added,
     "Query": rowData.Query || capture.query || body.query || "",
     "Snippet": rowData.Snippet || capture.snippet || body.snippet || "",
-    "Source Type": rowData["Source Type"] || capture.sourceType || capture.source || "chrome-extension"
+    "Source Type": rowData["Source Type"] || capture.sourceType || capture.source || "chrome-extension",
+    "Project": rowData.Project || capture.project || "",
+    "Language": rowData.Language || capture.language || "",
+    "Published At": rowData["Published At"] || capture.publishDate || "",
+    "Extra": captureExtra(capture)
   });
+}
+
+// Site-specific capture fields (tweetId, viewCount, ogTitle, ...) that have no column of their own.
+const CAPTURE_MAPPED = ["id", "url", "title", "notes", "timestamp", "savedBy", "query", "snippet",
+  "sourceType", "source", "project", "language", "publishDate"];
+function captureExtra(capture) {
+  const extra = {};
+  Object.keys(capture).forEach((key) => {
+    const value = capture[key];
+    if (CAPTURE_MAPPED.indexOf(key) === -1 && value !== "" && value != null) extra[key] = value;
+  });
+  return Object.keys(extra).length ? JSON.stringify(extra) : "";
 }
 
 // ── Canary rows (text/plain reply: OK / Unauthorized / ERROR: msg) ──────────

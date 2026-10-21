@@ -37,7 +37,17 @@ Items get server ids like `ITEM-2026-00001`. Extension and canary writes dedupe 
 ## Tests
 
 ```
-node --test
+node --test test/bridge.test.js
 ```
 
 No dependencies. Runs `test/bridge.test.js` against a fake SpreadsheetApp in `node:vm`.
+
+## Extension
+
+`extension/` is the unified Chrome extension: the canary-lite base, Save to Sheets capture (Google, X, YouTube, Facebook, right-click page/link/PDF/image), and one outbox that delivers every save to the team bridge. Canary inboxes stay in each browser; only saved items are sent.
+
+```
+cd extension && npm install && npm run build
+```
+
+Load `extension/dist` with "Load unpacked" in `chrome://extensions`, open the extension, Settings → Team, paste the join code and your name. Tests: `npx vitest run`. Save flow contract: `docs/extension-save-contract.md`.

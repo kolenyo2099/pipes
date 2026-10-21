@@ -72,9 +72,7 @@
   async function retrySheets() {
     const result = await api.retryFailedSheets($currentProjectId)
     if (result.ok) {
-      const { retried, results } = result.data
-      const ok = results.filter(r => r.success).length
-      notify('success', `Retried ${retried} – ${ok} succeeded`)
+      notify('success', `Queued ${result.data.retried} for the team sheet`)
     } else {
       notify('error', `Retry failed: ${result.error}`)
     }
@@ -200,11 +198,6 @@
       <button class="action-btn" on:click={() => api.openArchivesFolder()}>
         📁 Open archives folder
       </button>
-      {#if $currentProject?.sheet_sink?.sheet_url}
-        <button class="action-btn" on:click={() => api.openUrl($currentProject.sheet_sink.sheet_url)}>
-          📊 Open spreadsheet
-        </button>
-      {/if}
     </div>
   {/if}
 
