@@ -29,7 +29,7 @@ const orNotFound = (message) => value => { if (value === null || value === false
 
 async function sendItemToSheet(projectId, itemId) {
   const item = orNotFound('Item not found')(await store.getItem(projectId, itemId))
-  if (!await getTeam()) throw new HttpError(400, 'Join your team in Project Settings first')
+  if (!await getTeam()) throw new HttpError(400, 'Join your team first: Team sheet in the sidebar')
   const reply = await chrome.runtime.sendMessage({ type: 'pipeline:save', item: { kind: 'canary', ref: item.item_id, ...buildSheetRow(item) } })
   if (!reply?.ok) throw new HttpError(500, reply?.error || 'The save queue did not respond')
   // Delivery happens in the service worker; the result comes back through reconcileSheetResults.

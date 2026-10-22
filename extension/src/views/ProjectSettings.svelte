@@ -1,6 +1,5 @@
 <script>
   import NlpSettings from '../components/NlpSettings.svelte'
-  import TeamSettings from '../components/TeamSettings.svelte'
   import { onMount } from 'svelte'
   import { api } from '../api.js'
   import {
@@ -715,8 +714,6 @@
       </div>
     </div>
   </section>
-
-  <TeamSettings />
 
   <NlpSettings />
 

@@ -28,7 +28,7 @@ function badge(queue) {
 
 async function pipelineEnqueue(item) {
   const team = await getTeam()
-  if (!configured(team)) return { ok: false, error: 'Team not configured: paste the join code in Settings' }
+  if (!configured(team)) return { ok: false, error: 'Team not configured: open Pipeline → Team sheet and paste the join code' }
   if (item?.kind === 'capture' ? !item.capture?.url : item?.kind !== 'canary' || !item.ref || !item.headers || !item.values) return { ok: false, error: 'Invalid item' }
   const sent = (await store(SENT)) || {}
   const queued = await mutate(queue => {

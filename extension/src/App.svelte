@@ -9,6 +9,7 @@
   import Saved from './views/Saved.svelte'
   import NewProject from './views/NewProject.svelte'
   import ProjectSettings from './views/ProjectSettings.svelte'
+  import TeamSettings from './components/TeamSettings.svelte'
   import Logs from './views/Logs.svelte'
   import Timeline from './views/Timeline.svelte'
   import {
@@ -101,6 +102,8 @@
       </div>
     {:else if $currentView === 'new-project'}
       <NewProject />
+    {:else if $currentView === 'team'}
+      <TeamSettings />
     {:else if !$currentProjectId}
       <div class="no-project">
         <div class="welcome-icon">◈</div>

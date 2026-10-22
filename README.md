@@ -55,3 +55,11 @@ Load `extension/dist` with "Load unpacked" in `chrome://extensions`, open the ex
 ## Research pipeline
 
 `research/` is the entity-extraction pipeline and explorer (formerly kolenyo2099/entityview). `.github/workflows/pipeline.yml` runs it every 30 minutes against the team bridge, keeps its state on the orphan `data` branch and deploys the explorer to GitHub Pages. Setup (secrets `PIPELINE_TEAM_CODE`, `ANTHROPIC_API_KEY`; Pages source: GitHub Actions) is in `research/README.md`. Tests: `cd research && python3 test_pipeline.py`.
+
+## Smoke test
+
+`smoke/run.mjs` loads the built extension in headless Chromium against `smoke/fake-bridge.js` (the real `bridge/Code.gs` on an in-memory sheet) and checks the Team card, Google capture, Save all, canary saves, retry/park and wrong-token handling.
+
+```
+cd extension && npm run build && cd ../smoke && npm install && npx playwright install chromium && node run.mjs
+```

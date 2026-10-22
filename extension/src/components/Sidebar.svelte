@@ -201,6 +201,12 @@
     </div>
   {/if}
 
+  <!-- Team works without any Canary project: browser capture only needs the join code -->
+  <div class="section-label">Team</div>
+  <div class="quick-actions">
+    <button class="action-btn" class:active={$currentView === 'team'} on:click={() => setView('team')}>👥 Team sheet</button>
+  </div>
+
   <!-- Backup: data lives only in this browser profile; removing the extension deletes it -->
   <div class="section-label">Backup</div>
   <div class="quick-actions">
