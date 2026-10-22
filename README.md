@@ -51,3 +51,7 @@ cd extension && npm install && npm run build
 ```
 
 Load `extension/dist` with "Load unpacked" in `chrome://extensions`, open the extension, Settings → Team, paste the join code and your name. Tests: `npx vitest run`. Save flow contract: `docs/extension-save-contract.md`.
+
+## Research pipeline
+
+`research/` is the entity-extraction pipeline and explorer (formerly kolenyo2099/entityview). `.github/workflows/pipeline.yml` runs it every 30 minutes against the team bridge, keeps its state on the orphan `data` branch and deploys the explorer to GitHub Pages. Setup (secrets `PIPELINE_TEAM_CODE`, `ANTHROPIC_API_KEY`; Pages source: GitHub Actions) is in `research/README.md`. Tests: `cd research && python3 test_pipeline.py`.

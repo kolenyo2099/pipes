@@ -1,0 +1,73 @@
+name: pipeline
+on:
+  schedule: [{ cron: "*/30 * * * *" }]
+  workflow_dispatch:
+    inputs:
+      force_merge: { description: "Run llm_merge even if nothing new was collected", type: boolean, default: false }
+  repository_dispatch:
+    types: [saved]
+
+concurrency: { group: pipeline, cancel-in-progress: false }
+permissions: { contents: write, pages: write, id-token: write }
+# The research pipeline lives in research/; state paths below are relative to it.
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    outputs: { rebuilt: "${{ steps.run.outputs.rebuilt }}" }
+    defaults: { run: { working-directory: research } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with: { enable-cache: true }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+
+      # State lives on the orphan `data` branch (out/haiku, out/texts, data/data.js). First run: branch absent, start empty.
+      - name: Restore state
+        run: |
+          if git ls-remote --exit-code --heads origin data >/dev/null; then
+            git fetch --depth=1 origin data
+            git archive FETCH_HEAD | tar -x
+          fi
+
+      - id: run
+        run: python3 run.py
+        env:
+          PIPELINE_TEAM_CODE: ${{ secrets.PIPELINE_TEAM_CODE }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          FORCE_MERGE: ${{ inputs.force_merge && '1' || '' }}
+
+      # always(): a submitted batch id (out/haiku/batch.json) must survive a failed tick.
+      - name: Save state
+        if: always()
+        run: |
+          d=$(mktemp -d)
+          mkdir -p "$d/out" "$d/data"
+          cp -r out/haiku out/texts "$d/out/" 2>/dev/null || true
+          cp data/data.js "$d/data/" 2>/dev/null || true
+          cd "$d"
+          git init -q -b data
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -qm "pipeline state"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" data
+
+      - name: Assemble site
+        if: steps.run.outputs.rebuilt == 'true'
+        run: mkdir -p _site/data && cp index.html _site/ && cp data/data.js _site/data/
+      - uses: actions/upload-pages-artifact@v3
+        if: steps.run.outputs.rebuilt == 'true'
+        with: { path: research/_site }
+
+  # Separate job so only real deploys touch the github-pages environment.
+  deploy:
+    needs: tick
+    if: needs.tick.outputs.rebuilt == 'true'
+    runs-on: ubuntu-latest
+    environment: { name: github-pages, url: "${{ steps.deploy.outputs.page_url }}" }
+    steps:
+      - uses: actions/configure-pages@v5
+      - id: deploy
+        uses: actions/deploy-pages@v4
