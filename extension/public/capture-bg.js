@@ -72,12 +72,19 @@
     } catch { /* restricted page: the outbox badge still shows the queue */ }
   }
 
-  async function save({ capture, tabId }) {
+  // `manual`: also remember this tab for the Archive view's "Capture this tab now" (the engine runs in the app page,
+  // which has the DOM APIs, blob URLs and downloads it needs; a service worker cannot do the capture itself).
+  async function save({ capture, tabId, manual }) {
     const reply = await pipelineEnqueue({ kind: 'capture', capture });
+    if (reply?.ok && manual) {
+      const { pipelineManualTabs = [] } = await chrome.storage.session.get('pipelineManualTabs');
+      await chrome.storage.session.set({ pipelineManualTabs: [...pipelineManualTabs.filter((e) => e.tabId !== tabId), { tabId, url: capture.url, title: capture.title || '' }] });
+    }
     await toast(
       tabId,
       reply?.ok
-        ? `✅ Saved to team queue: "${(capture.title || capture.url).slice(0, 60)}"`
+        ? (manual ? `✅ Saved. Open Pipeline → Archive and press "Capture this tab now": "${(capture.title || capture.url).slice(0, 40)}"`
+                  : `✅ Saved to team queue: "${(capture.title || capture.url).slice(0, 60)}"`)
         : `❌ ${reply?.error || 'Save failed.'}`,
       !!reply?.ok
     );
@@ -132,6 +139,7 @@
     chrome.contextMenus.removeAll(() => {
       chrome.contextMenus.create({ id: 'pipeline-save-link', title: 'Save link to team sheet', contexts: ['link'] });
       chrome.contextMenus.create({ id: 'pipeline-save-page', title: 'Save page to team sheet', contexts: ['all'] });
+      chrome.contextMenus.create({ id: 'pipeline-archive-page', title: 'Archive this page to team sheet', contexts: ['all'] });
     });
   });
 
@@ -159,7 +167,7 @@
           pendingSave: { capture, tabId: tab.id }
         });
       }
-    } else if (info.menuItemId === 'pipeline-save-page') {
+    } else if (info.menuItemId === 'pipeline-save-page' || info.menuItemId === 'pipeline-archive-page') {
       let meta = {};
       try {
         const [r] = await chrome.scripting.executeScript({
@@ -207,6 +215,6 @@
       return;
     }
 
-    await save({ capture, tabId: tab.id });
+    await save({ capture, tabId: tab.id, manual: info.menuItemId === 'pipeline-archive-page' });
   });
 })();

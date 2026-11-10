@@ -6,6 +6,7 @@ import { recordNetworkEvent } from './har.js';
 import { sleep } from './util.js';
 
 const tabs = new Map();
+const COMMAND_TIMEOUT_MS = 90_000;
 let listening = false;
 
 function listen() {
@@ -63,9 +64,12 @@ export class CaptureTab {
     this.downloadStarted = false;
   }
 
-  send(method, params = {}) {
+  // A renderer that stops answering (print-to-PDF of an endless animation has done it) must not hang the capture.
+  send(method, params = {}, timeoutMs = COMMAND_TIMEOUT_MS) {
     if (this.detached) return Promise.reject(new Error(`Chrome debugger detached: ${this.detached}`));
-    return chrome.debugger.sendCommand({ tabId: this.tabId }, method, params);
+    let timer;
+    const limit = new Promise((_, reject) => { timer = setTimeout(() => reject(new TimeoutError(`${method} did not answer within ${timeoutMs}ms`)), timeoutMs); });
+    return Promise.race([chrome.debugger.sendCommand({ tabId: this.tabId }, method, params), limit]).finally(() => clearTimeout(timer));
   }
 
   dispatch(method, params) {

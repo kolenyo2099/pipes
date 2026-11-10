@@ -1,0 +1,205 @@
+[
+ {
+  "url": "https://www.reddit.com/r/test/comments/abc/title/",
+  "html": "<shreddit-post permalink=\"/r/test/comments/abc/title/\"><faceplate-timeago ts=\"2025-01-01T00:00:00Z\"></faceplate-timeago></shreddit-post><shreddit-comment permalink=\"/r/test/comments/abc/title/reply/\"><faceplate-date ts=\"2025-01-02T00:00:00Z\"></faceplate-date></shreddit-comment>",
+  "observations": [
+   [
+    "published",
+    "page",
+    "2025-01-01T00:00:00Z",
+    "reddit_time",
+    "2025-01-01T00:00:00+00:00"
+   ],
+   [
+    "published",
+    "related",
+    "2025-01-02T00:00:00Z",
+    "reddit_time",
+    "2025-01-02T00:00:00+00:00"
+   ]
+  ],
+  "errors": 0
+ },
+ {
+  "url": "https://www.threads.com/@test/post/ABC",
+  "html": "<a href=\"/@test/post/ABC\"><time datetime=\"2025-01-01T00:00:00Z\"></time></a><a href=\"/@test/post/OTHER\"><time datetime=\"2025-01-02T00:00:00Z\"></time></a>",
+  "observations": [
+   [
+    "published",
+    "page",
+    "2025-01-01T00:00:00Z",
+    "time",
+    "2025-01-01T00:00:00+00:00"
+   ],
+   [
+    "published",
+    "related",
+    "2025-01-02T00:00:00Z",
+    "time",
+    "2025-01-02T00:00:00+00:00"
+   ]
+  ],
+  "errors": 0
+ },
+ {
+  "url": "https://discord.com/channels/123/456",
+  "html": "<li id=\"chat-messages-456-789\"><time id=\"message-timestamp-789\" datetime=\"2025-01-01T00:00:00Z\"></time></li>",
+  "observations": [
+   [
+    "published",
+    "message",
+    "2025-01-01T00:00:00Z",
+    "time",
+    "2025-01-01T00:00:00+00:00"
+   ]
+  ],
+  "errors": 0
+ },
+ {
+  "url": "https://bsky.app/profile/test.example/post/notatid",
+  "html": "<a href=\"/profile/test.example/post/notatid\" data-tooltip=\"Oct 5, 2026 at 9:15 AM\" aria-label=\"date\">date</a>",
+  "observations": [
+   [
+    "published",
+    "page",
+    "Oct 5, 2026 at 9:15 AM",
+    "bluesky_tooltip",
+    "2026-10-05T09:15:00"
+   ]
+  ],
+  "errors": 0
+ },
+ {
+  "url": "https://www.linkedin.com/feed/",
+  "html": "<div data-id=\"urn:li:fsd_comment:(7439375291652931584,urn:li:activity:7377408251463745536)\"></div><a href=\"/posts/test-activity-7442889967015620608-abcd\">Another post</a>",
+  "observations": [
+   [
+    "commented",
+    "comment",
+    "7439375291652931584",
+    "linkedin_comment_id",
+    "2026-03-16T18:21:26.439000+00:00"
+   ],
+   [
+    "created",
+    "linked_item",
+    "7442889967015620608",
+    "platform_link_id",
+    "2026-03-26T11:07:30.345000+00:00"
+   ]
+  ],
+  "errors": 0
+ },
+ {
+  "url": "https://www.linkedin.com/jobs/view/123/",
+  "html": "<script type=\"application/json\">{\"entityUrn\":\"urn:li:fsd_jobPosting:123\",\"listedAt\":1735689600000}</script>",
+  "observations": [
+   [
+    "listed_in_ats",
+    "page",
+    "1735689600000",
+    "embedded_json",
+    "2025-01-01T00:00:00+00:00"
+   ]
+  ],
+  "errors": 0
+ },
+ {
+  "url": "https://bsky.app/profile/test.example/post/3k4duaz5vfs2b",
+  "html": "<script type=\"application/json\">{\"uri\":\"at://did:plc:author/app.bsky.feed.post/3k4duaz5vfs2b\",\"author\":{\"handle\":\"test.example\",\"did\":\"did:plc:author\"},\"record\":{\"$type\":\"app.bsky.feed.post\",\"createdAt\":\"2025-01-01T00:00:00.123456Z\"}}</script>",
+  "observations": [
+   [
+    "created",
+    "page",
+    "3k4duaz5vfs2b",
+    "platform_id",
+    "2023-08-07T05:31:12.411000+00:00"
+   ],
+   [
+    "created",
+    "page",
+    "2025-01-01T00:00:00.123456Z",
+    "embedded_json",
+    "2025-01-01T00:00:00.123456+00:00"
+   ]
+  ],
+  "errors": 0
+ },
+ {
+  "url": "https://www.tiktok.com/@test/video/7452496460970393642",
+  "html": "",
+  "observations": [
+   [
+    "created",
+    "page",
+    "7452496460970393642",
+    "platform_id",
+    "2024-12-25T23:32:27+00:00"
+   ]
+  ],
+  "errors": 0
+ },
+ {
+  "url": "https://www.tiktok.com/foryou",
+  "html": "<div id=\"xgwrapper-0-7452496460970393642\"></div>",
+  "observations": [
+   [
+    "created",
+    "feed_item",
+    "7452496460970393642",
+    "tiktok_dom_id",
+    "2024-12-25T23:32:27+00:00"
+   ]
+  ],
+  "errors": 0
+ },
+ {
+  "url": "https://www.linkedin.com/feed/",
+  "html": "<div data-id=\"urn:li:activity:7439375291652931584\"></div><div data-id=\"urn:li:comment:(activity:7439375291652931584,7442889967015620608)\"></div>",
+  "observations": [
+   [
+    "created",
+    "feed_item",
+    "7439375291652931584",
+    "linkedin_feed_id",
+    "2026-03-16T18:21:26.439000+00:00"
+   ],
+   [
+    "commented",
+    "comment",
+    "7442889967015620608",
+    "linkedin_comment_id",
+    "2026-03-26T11:07:30.345000+00:00"
+   ]
+  ],
+  "errors": 0
+ },
+ {
+  "url": "https://web.archive.org/web/20261014090000/https://www.linkedin.com/posts/test-activity-7439375291652931584-abcd",
+  "html": "<meta property=\"article:published_time\" content=\"2026-03-16\">",
+  "observations": [
+   [
+    "archive_snapshot",
+    "archive",
+    "https://web.archive.org/web/20261014090000/https://www.linkedin.com/posts/test-activity-7439375291652931584-abcd",
+    "wayback_url",
+    "2026-10-14T09:00:00+00:00"
+   ],
+   [
+    "created",
+    "page",
+    "7439375291652931584",
+    "platform_id",
+    "2026-03-16T18:21:26.439000+00:00"
+   ],
+   [
+    "published",
+    "page",
+    "2026-03-16",
+    "meta",
+    "2026-03-16T00:00:00"
+   ]
+  ],
+  "errors": 0
+ }
+]

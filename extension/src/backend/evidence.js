@@ -1,22 +1,35 @@
 // Evidence capture for one saved URL: HRC Archiver's browser engine (src/engine, ported from HRC's Chrome build)
 // drives a real tab over chrome.debugger, then the files, a hashes list, an RFC 3161 timestamp and a manifest are
 // written to Downloads/Pipeline/<id>/. Files stay on this machine; the sheet gets the hashes (see the queue).
-import { browserCapture, DownloadNavigation } from '../engine/browser.js'
+import { browserCapture, browserCaptureTab, DownloadNavigation } from '../engine/browser.js'
 import { openCaptureWindow, closeWindow } from '../engine/cdp.js'
-import { applyVerdict, verifyArchive } from '../engine/quality.js'
+import { applyVerdict, expectsMediaDownload, verifyArchive } from '../engine/quality.js'
+import { DEFAULT_MEDIA_CONFIG, hasPlayerHint, imageFiles, mediaLayer, playsMedia, probeMedia, removeRecordings, subtitleFiles } from '../engine/media-layer.js'
+import { VIDEO_INDICATOR_EXPRESSION } from '../engine/media/page-media.js'
 import { timestamp } from '../engine/timestamp.js'
+import { enrich, fallbackCapture } from '../engine/enrich.js'
 import { sha256Hex } from '../engine/util.js'
 
-const CONFIG = { timeout_ms: 30000, viewport_width: 1440, viewport_height: 900 }
+const CONFIG = { timeout_ms: 30000, viewport_width: 1440, viewport_height: 900, ...DEFAULT_MEDIA_CONFIG }
 const safe = (value) => String(value).replace(/[^\w.-]+/g, '_').slice(0, 80)
-const noLog = () => {}
+// Capture options the Archive view edits. Wayback is never implicit: both uses are off until someone turns them on.
+const OPTION_DEFAULTS = { fallback: true, wayback: false, fallbackWayback: false }
+export const getArchiveOptions = async () => ({ ...OPTION_DEFAULTS, ...(await globalThis.chrome?.storage?.local.get('pipelineArchiveOptions'))?.pipelineArchiveOptions })
+export const setArchiveOptions = (options) => chrome.storage.local.set({ pipelineArchiveOptions: options })
+// Verdicts that mean the live page itself was not captured (blocked, error page, blank), so a substitute is worth trying.
+const BLOCKED = /^(http_[45]|error_page|blank_render|navigation_error|page_not_captured)/
+
+const noLog = ({ level, message }) => console.debug('[archive]', level, message)
 
 /** The manifest text and its SHA-256 (the sheet's evidence_hash). `files` are { name, sha256, bytes }. Pure. */
-export async function buildManifest({ id, url, title, capturedAt, status, issues = [], files, tsa = null, finalUrl = null }) {
+export async function buildManifest({ id, url, title, capturedAt, status, issues = [], files, tsa = null, finalUrl = null, captureMode = null, media = [], extra = {} }) {
   const manifest = {
     id, url, final_url: finalUrl, title: title || '', captured_at: capturedAt, status, issues,
     files: [...files].sort((a, b) => a.name.localeCompare(b.name)),
-    timestamp_authority: tsa
+    timestamp_authority: tsa,
+    ...(captureMode && { capture_mode: captureMode }),
+    ...(media.length && { media }),
+    ...extra
   }
   const text = JSON.stringify(manifest, null, 2)
   return { text, sha256: await sha256Hex(text) }
@@ -50,25 +63,131 @@ function download(blob, filename) {
   })
 }
 
-/** Capture one item. Never throws: returns { status: 'done'|'needs_review'|'failed', evidence_hash, evidence_files, timestamp_token?, text?, issues?, error? }. */
-export async function archiveUrl({ id, url, title }) {
+/** What the Archive view shows per item: one short entry per saved audio/video/image/caption file. */
+export const mediaSummary = (list = []) => list.map(({ name, capture_method, duration, width, height }) => ({ name, method: capture_method, ...(duration && { duration }), ...(width && height && { width, height }) }))
+
+// Write media files next to the page evidence, one by one: a file the disk refuses is dropped and recorded, never fatal.
+async function saveMedia(id, files, result) {
+  const metadata = result.metadata
+  for (const file of files) {
+    try {
+      await download(file.blob, `Pipeline/${safe(id)}/${file.name}`)
+      result.files.push(file)
+      ;(metadata.capture_media ||= []).push({ name: file.name, ...file.properties })
+    } catch (error) {
+      metadata.media_extraction_error = `${file.name} could not be saved: ${error.message}`
+    }
+  }
+}
+
+// Audio/video, images and captions the page carries, saved like every other file. A failed grab never fails the
+// page capture: it is recorded (media_extraction_error → a media_extraction_failed review issue) and the page
+// evidence stands.
+async function addMedia(id, url, result, tab, { manual, temporary }) {
+  if (!CONFIG.media) return
+  const metadata = result.metadata
+  const sources = metadata.page_media_sources || []
+  const indicator = sources.length ? false : await tab.evaluate(VIDEO_INDICATOR_EXPRESSION).catch(() => false)
+  const dom = await result.files.find((f) => f.id === 'rendered_dom')?.blob.text()
+  if (playsMedia({ url, sources, indicator, hint: hasPlayerHint(dom) })) {
+    try {
+      // A manual capture never reloads the user's tab, so it cannot install the recorder: no playback recording.
+      const config = { ...CONFIG, record_playback: CONFIG.record_playback && !manual }
+      const found = await mediaLayer(url, { tab, capture: { metadata, dom }, config, log: noLog })
+      temporary.push(...found.temporary)
+      for (const file of found.files) file.properties = { ...(await probeMedia(file.blob).catch(() => null)), ...file.properties }
+      await saveMedia(id, found.files, result)
+      if (found.error) metadata.media_extraction_error = found.error
+    } catch (error) {
+      temporary.push(...(error.temporary || []))
+      // Nothing indicated media on this page: not a failure.
+      if (error.message !== 'No media found') metadata.media_extraction_error = error.message
+    }
+  }
+  // Images and captions are best effort: a failure is noted in the log, not an issue.
+  try {
+    const images = await imageFiles(result.image_sources)
+    await saveMedia(id, images.files, result)
+    if (images.failed.length) metadata.image_errors = images.failed
+    await saveMedia(id, await subtitleFiles(result.track_sources), result)
+  } catch (error) {
+    metadata.image_errors = [error.message]
+  }
+  if (metadata.media_extraction_error) (metadata.capture_layers ||= []).push({ name: 'media_layer', role: 'media', error: metadata.media_extraction_error })
+  metadata.capture_artifacts = result.files.map((f) => f.name)
+}
+
+/**
+ * Capture one item. Never throws: returns { status: 'done'|'needs_review'|'failed', evidence_hash, evidence_files, timestamp_token?, text?, issues?, error? }.
+ * With `tabId` it captures that already-open tab as it stands (manual capture: the user got past a bot wall or logged in)
+ * instead of opening the URL in a new window; the result then carries capture_mode: 'manual'.
+ */
+export async function archiveUrl(job) {
+  const state = {}
+  let timer
+  // A wedged tab (a renderer that never answers CDP) must not stall the whole queue: give up, close the window.
+  // ponytail: one wall-clock cap for page + media; the 15-minute playback recording is the longest legitimate step.
+  const limit = new Promise((resolve) => { timer = setTimeout(() => resolve({ status: 'failed', error: 'Capture timed out and was abandoned' }), (CONFIG.max_record_minutes + 5) * 60_000) })
+  const result = await Promise.race([capture(job, state), limit])
+  clearTimeout(timer)
+  if (result.error === 'Capture timed out and was abandoned') await closeWindow(state.windowId)
+  return result
+}
+
+async function capture({ id, url, title, tabId }, state) {
   let windowId = null
+  const temporary = []
+  const manual = tabId != null
   try {
     if (!/^https?:\/\//i.test(url)) throw new Error('Only http(s) URLs can be archived')
-    windowId = await openCaptureWindow()
-    let result, tab
-    try {
-      ;({ result, tab } = await browserCapture(url, { config: CONFIG, windowId, log: noLog }))
-    } catch (error) {
-      if (!(error instanceof DownloadNavigation)) throw error
-      result = await sourceDocument(url)
+    const options = await getArchiveOptions()
+    let result, tab, restore, liveError
+    if (manual) {
+      ;({ result, tab, restore } = await browserCaptureTab(tabId, url, { config: CONFIG, log: noLog }))
+    } else {
+      windowId = state.windowId = await openCaptureWindow()
+      try {
+        ;({ result, tab } = await browserCapture(url, { config: CONFIG, windowId, recordMedia: CONFIG.media && CONFIG.record_playback && expectsMediaDownload(url), log: noLog }))
+      } catch (error) {
+        if (error instanceof DownloadNavigation) result = await sourceDocument(url)
+        else if (options.fallback) liveError = error // maybe an alternate version can still be saved
+        else throw error
+      }
     }
-    await tab?.close()
+    result ||= { status: '', metadata: { navigation_error: liveError.message }, files: [] }
+    try {
+      if (tab) await addMedia(id, url, result, tab, { manual, temporary })
+    } finally {
+      await restore?.()
+      await tab?.close()
+    }
     const metadata = result.metadata
-    const verdict = verifyArchive({ status: result.status, metadata, media: result.files.map((f) => ({ filename: f.name, properties: { id: f.id }, _mimetype: f.blob.type })) }, { url })
+    const verdict = verifyArchive({ status: result.status, metadata, media: result.files.map((f) => ({ filename: f.name, properties: { id: f.id }, _mimetype: f.mimetype || f.blob.type })) }, { url })
     applyVerdict(metadata, verdict)
 
+    // The live page was blocked or broken: try an alternate version. It is saved next to whatever was captured,
+    // named substitute-*, with its provenance, and the item always goes to review: never presented as the live page.
+    if (!manual && options.fallback && verdict.some((i) => BLOCKED.test(i.code))) {
+      const found = await fallbackCapture(url, { reason: metadata.capture_issue_summary, wayback: options.fallbackWayback })
+      if (found) {
+        result.files.push(...found.files)
+        result.text ||= found.text
+        Object.assign(metadata, { substituted: true, substitution: found.metadata.substitution })
+        const { kind, source_url } = found.metadata.substitution
+        applyVerdict(metadata, [...verdict, { code: 'substituted_content', message: `The live page was not captured; a ${kind} copy from ${source_url} is saved as a substitute` }])
+      }
+    }
+    if (liveError && !metadata.substituted) throw liveError
+
+    // Publication dates from the captured DOM, and the optional Wayback save. Best effort: never fails the capture.
+    const extra = await enrich({ url, result, options: { wayback: options.wayback } }).catch(() => null)
+    if (extra) {
+      result.files.push(...extra.files)
+      Object.assign(metadata, extra.metadata)
+    }
+
     const folder = `Pipeline/${safe(id)}`
+    const written = new Set(result.files.filter((f) => f.properties).map((f) => f.name)) // media: already on disk
     const out = result.files.map(({ name, blob }) => ({ name, blob }))
     const files = []
     for (const f of out) files.push({ name: f.name, sha256: await sha256Hex(f.blob), bytes: f.blob.size })
@@ -82,9 +201,10 @@ export async function archiveUrl({ id, url, title }) {
       files.push({ name: 'hashes.tsr', sha256: await sha256Hex(blob), bytes: blob.size })
     }
     const status = metadata.capture_quality === 'needs_review' ? 'needs_review' : 'done'
-    const manifest = await buildManifest({ id, url, title: title || metadata.title, finalUrl: metadata.final_url, capturedAt: new Date().toISOString(), status, issues: metadata.capture_issues, files, tsa: stamped?.tsa ?? null })
+    const manifest = await buildManifest({ id, url, title: title || metadata.title, finalUrl: metadata.final_url, capturedAt: new Date().toISOString(), status, issues: metadata.capture_issues, files, tsa: stamped?.tsa ?? null, captureMode: manual ? 'manual' : null, media: metadata.capture_media,
+      extra: { ...(metadata.source_dates && { source_dates: metadata.source_dates }), ...(metadata.wayback && { wayback: metadata.wayback }), ...(metadata.substitution && { substitution: metadata.substitution }) } })
     out.push({ name: 'manifest.json', blob: new Blob([manifest.text], { type: 'application/json' }) })
-    for (const f of out) await download(f.blob, `${folder}/${f.name}`)
+    for (const f of out) if (!written.has(f.name)) await download(f.blob, `${folder}/${f.name}`)
 
     return {
       status, evidence_hash: manifest.sha256,
@@ -92,11 +212,17 @@ export async function archiveUrl({ id, url, title }) {
       ...(stamped && { timestamp_token: btoa(String.fromCharCode(...new Uint8Array(stamped.token))) }),
       ...(result.text && { text: result.text }),
       issues: metadata.capture_issues,
+      ...(manual && { capture_mode: 'manual' }),
+      media: mediaSummary(metadata.capture_media),
+      ...(extra?.published_at && { published_at: extra.published_at }),
+      ...(metadata.wayback?.wayback_url && { wayback_url: metadata.wayback.wayback_url }),
+      ...(metadata.substitution && { substitution: { kind: metadata.substitution.kind, source_url: metadata.substitution.source_url } }),
       ...(status === 'needs_review' && { error: metadata.capture_issue_summary })
     }
   } catch (error) {
     return { status: 'failed', error: error?.message || String(error) }
   } finally {
+    await removeRecordings(temporary)
     await closeWindow(windowId)
   }
 }

@@ -1,0 +1,62 @@
+[
+ {
+  "name": "government_meta",
+  "url": "https://agency.example/news/item?id=1",
+  "html": "<meta property=\"article:published_time\" content=\"2025-11-14\">"
+ },
+ {
+  "name": "video_meta",
+  "url": "https://video.example/watch?v=abc123",
+  "html": "<meta itemprop=\"datePublished\" content=\"2026-02-07T10:30:06-08:00\">\n<meta itemprop=\"uploadDate\" content=\"2026-02-07T10:30:06-08:00\">"
+ },
+ {
+  "name": "news_jsonld",
+  "url": "https://news.example/fr/story/a-1",
+  "html": "<script type=\"application/ld+json\">{\"@context\":\"https://schema.org\",\"@type\":\"NewsArticle\",\"mainEntityOfPage\":{\"@type\":\"WebPage\",\"@id\":\"https://news.example/fr/story/a-1\"},\"datePublished\":\"2025-04-28T18:09:29.458Z\",\"dateModified\":\"2025-04-28T18:09:29.458Z\"}</script>"
+ },
+ {
+  "name": "news_jsonld_separate_update",
+  "url": "https://news.example/story/202601",
+  "html": "<script type=\"application/ld+json\">{\"@context\":\"https://schema.org\",\"@type\":\"NewsArticle\",\"url\":\"https://news.example/story/202601\",\"datePublished\":\"2026-01-20T18:04:43.845Z\",\"dateModified\":\"2026-01-20T18:09:22Z\"}</script>"
+ },
+ {
+  "name": "social_thread",
+  "url": "https://x.com/someone/status/1900000000000000001",
+  "html": "<a href=\"/someone/status/1900000000000000001\"><time datetime=\"2026-02-04T21:23:36.000Z\">Feb 4</time></a>\n<a href=\"/other/status/1900000000000000099\"><time datetime=\"2026-02-05T01:00:00.000Z\">Feb 5</time></a>"
+ },
+ {
+  "name": "labeled_update",
+  "url": "https://site.example/country-page",
+  "html": "<p class=\"small\">Last updated July 10, 2026</p>"
+ },
+ {
+  "name": "header_clock",
+  "url": "https://site.example/fa/tags/1",
+  "html": "<time datetime=\"۱۲/مرداد/۱۴۰۵\" class=\"headerDateFa\">۱۲/مرداد/۱۴۰۵</time>\n<time datetime=\"2026-08-03T10:00:00Z\" class=\"headerDateEn\">Aug 3</time>"
+ },
+ {
+  "name": "jobs_relative",
+  "url": "https://www.linkedin.com/jobs/view/1234567890/",
+  "html": "<div data-sdui-screen=\"com.linkedin.sdui.flagshipnav.jobs.JobDetails\"><p>Example City · 2 months ago · 50 applicants</p></div>\n<a href=\"/jobs/view/other-role-999/\"><p>3 days ago</p></a>"
+ },
+ {
+  "name": "social_json_target",
+  "url": "https://www.instagram.com/p/ABCdefGHIjk/",
+  "html": "<script type=\"application/json\">{\"__typename\": \"XIGPolarisVideoMedia\", \"code\": \"ABCdefGHIjk\", \"taken_at\": 1758961306}</script>"
+ },
+ {
+  "name": "jobs_relative_month",
+  "url": "https://www.linkedin.com/jobs/view/1234567891/",
+  "html": "<div data-sdui-screen=\"com.linkedin.sdui.flagshipnav.jobs.JobDetails\"><p>Example City · 1 month ago · 12 applicants</p></div>"
+ },
+ {
+  "name": "jobs_search_card",
+  "url": "https://www.linkedin.com/jobs/view/1234567890/",
+  "html": "<div data-entity-urn=\"urn:li:jobPosting:1234567890\"><time class=\"job-search-card__listdate\" datetime=\"2026-09-15\">4 weeks ago</time></div>\n<div data-entity-urn=\"urn:li:jobPosting:55\"><time class=\"job-search-card__listdate--new\" datetime=\"2026-10-06\">1 week ago</time></div>"
+ },
+ {
+  "name": "encoded_path_entity",
+  "url": "https://news.example/fa/n/%D8%AE%D8%A8%D8%B1",
+  "html": "<meta property=\"article:published_time\" content=\"2026-02-07T23:56:45\">\n<script type=\"application/ld+json\">{\"@type\":\"NewsArticle\",\"mainEntityOfPage\":{\"@id\":\"https://news.example/fa/n/خبر\"},\"datePublished\":\"2026-02-07T20:26:45.000Z\"}</script>"
+ }
+]

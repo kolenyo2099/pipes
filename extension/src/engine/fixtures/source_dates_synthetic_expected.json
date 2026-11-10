@@ -1,0 +1,273 @@
+{
+ "government_meta": {
+  "observations": [
+   [
+    "published",
+    "page",
+    "2025-11-14",
+    "meta",
+    "2025-11-14T00:00:00"
+   ]
+  ],
+  "selected": {
+   "published": "2025-11-14"
+  },
+  "reported_relative": {}
+ },
+ "video_meta": {
+  "observations": [
+   [
+    "published",
+    "page",
+    "2026-02-07T10:30:06-08:00",
+    "meta",
+    "2026-02-07T18:30:06+00:00"
+   ],
+   [
+    "uploaded",
+    "page",
+    "2026-02-07T10:30:06-08:00",
+    "meta",
+    "2026-02-07T18:30:06+00:00"
+   ]
+  ],
+  "selected": {
+   "published": "2026-02-07T18:30:06+00:00",
+   "uploaded": "2026-02-07T18:30:06+00:00"
+  },
+  "reported_relative": {}
+ },
+ "news_jsonld": {
+  "observations": [
+   [
+    "published",
+    "page",
+    "2025-04-28T18:09:29.458Z",
+    "json_ld",
+    "2025-04-28T18:09:29.458000+00:00"
+   ],
+   [
+    "updated",
+    "page",
+    "2025-04-28T18:09:29.458Z",
+    "json_ld",
+    "2025-04-28T18:09:29.458000+00:00"
+   ]
+  ],
+  "selected": {
+   "published": "2025-04-28T18:09:29.458000+00:00",
+   "updated": "2025-04-28T18:09:29.458000+00:00"
+  },
+  "reported_relative": {}
+ },
+ "news_jsonld_separate_update": {
+  "observations": [
+   [
+    "published",
+    "page",
+    "2026-01-20T18:04:43.845Z",
+    "json_ld",
+    "2026-01-20T18:04:43.845000+00:00"
+   ],
+   [
+    "updated",
+    "page",
+    "2026-01-20T18:09:22Z",
+    "json_ld",
+    "2026-01-20T18:09:22+00:00"
+   ]
+  ],
+  "selected": {
+   "published": "2026-01-20T18:04:43.845000+00:00",
+   "updated": "2026-01-20T18:09:22+00:00"
+  },
+  "reported_relative": {}
+ },
+ "social_thread": {
+  "observations": [
+   [
+    "created",
+    "linked_item",
+    "1900000000000000099",
+    "platform_link_id",
+    "2025-03-13T01:44:34.949000+00:00"
+   ],
+   [
+    "created",
+    "page",
+    "1900000000000000001",
+    "platform_id",
+    "2025-03-13T01:44:34.949000+00:00"
+   ],
+   [
+    "published",
+    "page",
+    "2026-02-04T21:23:36.000Z",
+    "time",
+    "2026-02-04T21:23:36+00:00"
+   ],
+   [
+    "published",
+    "related",
+    "2026-02-05T01:00:00.000Z",
+    "time",
+    "2026-02-05T01:00:00+00:00"
+   ]
+  ],
+  "selected": {
+   "published": "2026-02-04T21:23:36+00:00"
+  },
+  "reported_relative": {}
+ },
+ "labeled_update": {
+  "observations": [
+   [
+    "updated",
+    "unresolved",
+    "July 10, 2026",
+    "labeled_text",
+    "2026-07-10T00:00:00"
+   ]
+  ],
+  "selected": {},
+  "reported_relative": {}
+ },
+ "header_clock": {
+  "observations": [
+   [
+    "unknown",
+    "site_clock",
+    "2026-08-03T10:00:00Z",
+    "time",
+    "2026-08-03T10:00:00+00:00"
+   ],
+   [
+    "unknown",
+    "site_clock",
+    "۱۲/مرداد/۱۴۰۵",
+    "time",
+    null
+   ]
+  ],
+  "selected": {},
+  "reported_relative": {}
+ },
+ "jobs_relative": {
+  "observations": [
+   [
+    "published",
+    "page",
+    "2 months ago",
+    "linkedin_relative",
+    null
+   ],
+   [
+    "published",
+    "related",
+    "3 days ago",
+    "linkedin_relative",
+    null
+   ]
+  ],
+  "selected": {},
+  "reported_relative": {
+   "published": [
+    "2 months ago"
+   ]
+  }
+ },
+ "social_json_target": {
+  "observations": [
+   [
+    "published",
+    "page",
+    "1758961306",
+    "embedded_json",
+    "2025-09-27T08:21:46+00:00"
+   ]
+  ],
+  "selected": {
+   "published": "2025-09-27T08:21:46+00:00"
+  },
+  "reported_relative": {}
+ },
+ "jobs_relative_month": {
+  "observations": [
+   [
+    "published",
+    "page",
+    "1 month ago",
+    "linkedin_relative",
+    null
+   ]
+  ],
+  "selected": {},
+  "reported_relative": {
+   "published": [
+    "1 month ago"
+   ]
+  }
+ },
+ "jobs_search_card": {
+  "observations": [
+   [
+    "published",
+    "page",
+    "2026-09-15",
+    "time",
+    "2026-09-15T00:00:00"
+   ],
+   [
+    "published",
+    "page",
+    "4 weeks ago",
+    "linkedin_relative",
+    null
+   ],
+   [
+    "published",
+    "related",
+    "1 week ago",
+    "linkedin_relative",
+    null
+   ],
+   [
+    "published",
+    "related",
+    "2026-10-06",
+    "time",
+    "2026-10-06T00:00:00"
+   ]
+  ],
+  "selected": {
+   "published": "2026-09-15"
+  },
+  "reported_relative": {
+   "published": [
+    "4 weeks ago"
+   ]
+  }
+ },
+ "encoded_path_entity": {
+  "observations": [
+   [
+    "published",
+    "page",
+    "2026-02-07T23:56:45",
+    "meta",
+    "2026-02-07T23:56:45"
+   ],
+   [
+    "published",
+    "related",
+    "2026-02-07T20:26:45.000Z",
+    "json_ld",
+    "2026-02-07T20:26:45+00:00"
+   ]
+  ],
+  "selected": {
+   "published": "2026-02-07T23:56:45"
+  },
+  "reported_relative": {}
+ }
+}

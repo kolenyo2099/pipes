@@ -6,7 +6,7 @@ import { hostOf } from './util.js';
 
 const ERROR_TITLES = [
   'technical difficulties', 'access denied', 'attention required', 'error 403',
-  'page not found', 'service unavailable', 'just a moment', 'request could not be satisfied'
+  'page not found', 'service unavailable', 'just a moment', 'client challenge', 'request could not be satisfied'
 ];
 const FACEBOOK_LOGIN_TITLES = ['log into facebook', 'facebook – log in or sign up', 'facebook - log in or sign up'];
 const FACEBOOK_UNAVAILABLE_TEXT = [
@@ -64,6 +64,21 @@ export function javascriptRetryReason(dom) {
 
 const CLIPPED_CONTENT_RATIO = 1.5;
 
+/**
+ * Detect substantial laid-out text hidden by reveal/animation CSS (capture_quality.hidden_content_reason).
+ * A small hidden control is normal. At least 200 hidden characters and more hidden than visible text needs a
+ * scripted retry, or review if scripts still cannot reveal it.
+ */
+export function hiddenContentReason(metrics) {
+  if (!metrics || typeof metrics !== 'object') return null;
+  const { hidden, visible } = metrics;
+  if (typeof hidden !== 'number' || typeof visible !== 'number') return null;
+  if (hidden >= 200 && visible >= 0 && hidden > visible) {
+    return `page has ${hidden.toFixed(0)} hidden text characters but only ${visible.toFixed(0)} visible characters`;
+  }
+  return null;
+}
+
 export function clippedRenderReason(metrics) {
   if (!metrics || typeof metrics !== 'object') return null;
   const { document: doc, content } = metrics;
@@ -118,6 +133,8 @@ export function assessBrowserCapture({
   if (navigationError) issues.push(issue('navigation_error', `Browser navigation was incomplete: ${navigationError}`));
   if (ERROR_TITLES.some((m) => normalizedTitle.includes(m))) issues.push(issue('error_page', `Captured page title indicates an error: ${title}`));
   if (blankRender) issues.push(issue('blank_render', `Page rendered no visible content: ${blankRender}`));
+  const hiddenReason = hiddenContentReason(signals.text_visibility);
+  if (hiddenReason) issues.push(issue('hidden_content', hiddenReason));
   if (host === 'facebook.com' || host.endsWith('.facebook.com')) {
     const loginWall = FACEBOOK_LOGIN_TITLES.some((m) => normalizedTitle.includes(m)) ||
       final.includes('/login') || final.includes('/checkpoint') || Boolean(signals.login_form_present);
@@ -143,7 +160,7 @@ const PAGE_DIAGNOSTIC_KEYS = ['final_url', 'status_code', 'navigation_error', 'j
 const DERIVED_CODES = new Set([
   'result_metadata_incomplete', 'compound_url', 'page_not_captured', 'media_extraction_failed',
   'embedded_media_not_captured', 'legacy_social_capture_unverified', 'blank_render', 'navigation_error',
-  'error_page', 'http_status_unknown', 'facebook_session_cookie_missing', 'facebook_login_required',
+  'error_page', 'hidden_content', 'http_status_unknown', 'facebook_session_cookie_missing', 'facebook_login_required',
   'facebook_authentication_rejected', 'facebook_content_unavailable'
 ]);
 const isDerived = (code) => DERIVED_CODES.has(code) || code.startsWith('http_');
@@ -227,6 +244,10 @@ function mediaIssues(metadata, media, url) {
     }
   } else {
     issues.push(...storedIssues(metadata).filter((i) => i.code === 'media_extraction_failed').map((i) => issue(i.code, i.message)));
+  }
+  // The extension runs its media layer only on pages that play media, so any recorded failure is a real one.
+  if (metadata.media_extraction_error && !isNoMediaPresent(String(metadata.media_extraction_error))) {
+    issues.push(issue('media_extraction_failed', `Page evidence was captured, but its audio/video could not be saved: ${metadata.media_extraction_error}`));
   }
   if (Array.isArray(metadata.page_media_sources) && metadata.page_media_sources.length && !media.some(isAudioOrVideo)) {
     issues.push(issue('embedded_media_not_captured', 'The page contains embedded video/audio that was not saved'));

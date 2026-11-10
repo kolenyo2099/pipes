@@ -1,11 +1,12 @@
 // End-to-end smoke test: real built extension in Chromium + real bridge/Code.gs behind a local HTTP server.
 //   cd extension && npm run build && cd ../smoke && npm install && node run.mjs
 import { chromium } from 'playwright'
-import { spawn } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import fs from 'node:fs'
+import crypto from 'node:crypto'
 import os from 'node:os'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
@@ -21,7 +22,12 @@ const PORT = 8787, BRIDGE = `http://127.0.0.1:${PORT}/`
 const results = []
 const check = (name, ok, detail = '') => { results.push(ok); console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${detail ? ' — ' + detail : ''}`) }
 
-const server = spawn('node', [path.join(here, 'fake-bridge.js'), String(PORT)], { stdio: 'inherit' })
+// A tiny webm for the media check (skipped when ffmpeg is missing).
+const video = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'pipeline-video-')), 't.webm')
+const haveVideo = spawnSync('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc=duration=1:size=160x120:rate=10', '-c:v', 'libvpx', '-b:v', '100k', video]).status === 0
+const image = path.join(path.dirname(video), 't.png')
+const haveImage = spawnSync('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc=size=400x300', '-frames:v', '1', image]).status === 0
+const server = spawn('node', [path.join(here, 'fake-bridge.js'), String(PORT)], { stdio: 'inherit', env: { ...process.env, ...(haveVideo && { SMOKE_VIDEO: video }), ...(haveImage && { SMOKE_IMAGE: image }) } })
 process.on('exit', () => server.kill())
 await sleep(500)
 const sheet = async () => (await fetch(BRIDGE + '_sheet')).json()
@@ -53,6 +59,7 @@ try {
   // App page renders without errors.
   const app = await context.newPage()
   app.on('pageerror', e => errors.push('app: ' + e.message))
+  if (process.env.SMOKE_VERBOSE) app.on('console', m => console.log('  app>', m.text().slice(0, 300)))
   await app.goto(`chrome-extension://${id}/index.html`)
   await app.waitForTimeout(1500)
   check('app page renders', (await app.locator('body').innerText()).length > 20)
@@ -144,9 +151,84 @@ try {
     if (done) {
       const files = JSON.parse(done['Evidence Files'] || '[]').map(f => f.name)
       check('  screenshot, PDF, MHTML, HAR, DOM, hashes, manifest', ['screenshot.png', 'page.pdf', 'snapshot.mhtml', 'network.har', 'dom.html', 'hashes.txt', 'manifest.json'].every(n => files.includes(n)), files.join(', '))
+      check('  publication date read from the page', files.includes('source-dates.json') && String(done['Published At']).startsWith('2026-03-04'), String(done['Published At']))
       check('  row unlocked and stamped', !done['Locked By'] && !!done['Captured At'] && !!done['Archived At'])
     }
     await shot('archive-done')
+  }
+
+  // Capture-engine checks: hidden content, scroll containers, media, manual capture (local pages from fake-bridge.js).
+  const rowFor = async u => (await archive()).find(r => r.URL === u)
+  const captureLocal = async (route, title) => {
+    const u = BRIDGE + route
+    await app.bringToFront()
+    await sw.evaluate(u => pipelineEnqueue({ kind: 'capture', capture: { url: u, title: u.split('/').pop(), sourceType: 'page' } }), u)
+    await until(() => rowFor(u))
+    await app.getByRole('button', { name: 'Refresh' }).click()
+    const c = app.locator('.card', { hasText: u.split('/').pop() })
+    if (!(await until(async () => (await c.count()) > 0, 8000))) return null
+    await c.getByRole('button', { name: 'Archive', exact: true }).click()
+    const row = await until(async () => { const r = await rowFor(u); return r && r.Status !== 'pending' && r }, 150000)
+    if (!row && process.env.SMOKE_VERBOSE) console.log('  state>', await app.evaluate(() => document.visibilityState), JSON.stringify(await sw.evaluate(() => chrome.debugger.getTargets().then(t => t.filter(x => x.attached).map(x => x.url)))))
+    return row
+  }
+  // Playwright renames downloads to opaque GUIDs, so find a downloaded file by the SHA-256 the sheet recorded for it.
+  const sha = file => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex')
+  const downloaded = async (row, name) => {
+    const want = JSON.parse(row['Evidence Files'] || '[]').find(f => f.name === name)?.sha256
+    const files = await sw.evaluate(() => chrome.downloads.search({}).then(d => d.filter(x => x.exists).map(x => x.filename)))
+    return want && files.find(f => sha(f) === want)
+  }
+  const issues = r => (JSON.parse(r['Result Metadata'] || '{}').capture_issues || []).map(i => i.code)
+
+  const stuck = await captureLocal('_hidden-stuck')
+  check('(a) text stuck behind an animation → needs_review with hidden_content', !!stuck && stuck.Status === 'needs_review' && issues(stuck).includes('hidden_content'), stuck && `${stuck.Status} ${issues(stuck)}`)
+  const reveal = await captureLocal('_hidden-reveal')
+  check('(a) text revealed after a delay → done, no issues', !!reveal && reveal.Status === 'done' && !issues(reveal).length, reveal && `${reveal.Status} ${issues(reveal)}`)
+
+  const shell = await captureLocal('_appshell')
+  const shellPng = shell && await downloaded(shell, 'screenshot.png')
+  if (shellPng) {
+    const png = fs.readFileSync(shellPng), height = png.readUInt32BE(20)
+    check('(b) app shell: screenshot covers the inner scroll panel (> 2500px; 900px without the fix)', height > 2500, `${png.readUInt32BE(16)}x${height}`)
+  } else check('(b) app shell: screenshot covers the inner scroll panel', false, shell ? 'screenshot not found in downloads' : 'capture timed out')
+
+  if (!haveVideo) console.log('SKIP (c) page with a <video>: ffmpeg not available')
+  else {
+    const vid = await captureLocal('_video')
+    const names = vid ? JSON.parse(vid['Evidence Files'] || '[]') : []
+    const clip = names.find(f => /\.webm$/.test(f.name))
+    const file = clip && await downloaded(vid, clip.name)
+    const hash = file && sha(file)
+    check('(c) <video> saved into Evidence Files with its hash', !!clip && hash === clip.sha256 && vid.Status === 'done', vid && `${vid.Status} ${names.map(f => f.name).join(', ')}`)
+    const meta = vid ? JSON.parse(vid['Result Metadata'] || '{}') : {}
+    check('  its image and caption file are saved too, and the manifest data names how the video was obtained', names.some(f => /^media_image_1\.png$/.test(f.name)) && names.some(f => /^subtitles-1\.vtt$/.test(f.name)) && (meta.media || []).some(m => m.method === 'direct' && m.duration > 0 && m.width === 160), JSON.stringify(meta.media))
+  }
+
+  // (d) Manual capture of an already-open tab through the Archive view's own buttons.
+  const wall = BRIDGE + '_walled'
+  await sw.evaluate(u => pipelineEnqueue({ kind: 'capture', capture: { url: u, title: 'walled-item', sourceType: 'page' } }), wall)
+  await until(() => rowFor(wall))
+  await app.getByRole('button', { name: 'Refresh' }).click()
+  const wcard = app.locator('.card', { hasText: 'walled-item' })
+  await until(async () => (await wcard.count()) > 0, 8000)
+  const opened = context.waitForEvent('page', { timeout: 10000 }).catch(() => null)
+  await wcard.getByRole('button', { name: 'Capture from my tab' }).click()
+  const userTab = await opened
+  check('(d) "Capture from my tab" opens the URL in a normal tab', !!userTab && userTab.url().includes('_walled'))
+  if (userTab) {
+    await userTab.waitForLoadState('domcontentloaded')
+    // The person solves the check: the page changes in place (no reload), which a reload-based capture would lose.
+    await userTab.evaluate(() => { window.__marker = 42; document.title = 'Walled article'; document.body.innerHTML = '<main><h1>Walled article</h1>' + '<p>Text behind the wall that only the person could reach.</p>'.repeat(30) + '</main>' })
+    await app.bringToFront()
+    const tabCard = app.locator('.card', { hasText: 'Capture this tab now' })
+    await until(async () => (await tabCard.count()) > 0, 8000)
+    await tabCard.getByRole('button', { name: 'Capture this tab now' }).click()
+    const manual = await until(async () => { const r = await rowFor(wall); return r && r.Status !== 'pending' && r }, 120000)
+    const meta = manual ? JSON.parse(manual['Result Metadata'] || '{}') : {}
+    check('(d) manual capture of the open tab → done, capture_mode manual, row unlocked', !!manual && manual.Status === 'done' && meta.capture_mode === 'manual' && !manual['Locked By'] && !!manual['Evidence Hash'], manual && `${manual.Status} ${manual['Result Metadata']}`.slice(0, 200))
+    const text = manual && ((await sheet()).Texts || []).some(r => r[0] === manual.ID && /behind the wall/.test(r[1]))
+    check('  the tab was not reloaded, is scriptable again, and its text reached the sheet', (await userTab.evaluate(() => window.__marker)) === 42 && !!text)
   }
   await app.getByRole('button', { name: /Explore/ }).first().click()
   check('Explore embeds the explorer', !!(await until(async () => (await app.locator(`iframe[src="${article}"]`).count()) > 0, 8000)), (await app.locator('main').innerText()).slice(0, 120).replace(/\s+/g, ' '))
