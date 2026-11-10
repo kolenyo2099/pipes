@@ -13,6 +13,7 @@ http.createServer((req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     const url = new URL(req.url, 'http://x');
     if (url.pathname === '/_sheet') return res.end(JSON.stringify(Object.fromEntries(b.spreadsheet.sheets.map((s) => [s.name, s.rows]))));
+    if (url.pathname === '/_article') { res.setHeader('Content-Type', 'text/html'); return res.end('<!doctype html><title>Smoke article</title><main><h1>Smoke article</h1><p>' + 'Deportation flights resumed on Tuesday, officials said. '.repeat(40) + '</p></main>'); }
     if (url.pathname === '/_fail') { failing = JSON.parse(body).on; return res.end('ok'); }
     if (failing) { res.statusCode = 500; return res.end('down'); }
     const out = req.method === 'POST'

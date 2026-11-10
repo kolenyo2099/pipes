@@ -1,5 +1,5 @@
 /**
- * Pipeline unified Google Apps Script bridge (v6).
+ * Pipeline unified Google Apps Script bridge (v7).
  *
  * One deployed web app per team sheet. Replaces the Save to Sheets / HRC
  * Archiver bridge (v5), the canary-lite receiver and the research push
@@ -9,10 +9,11 @@
  *   Deploy → New deployment → Web app, Execute as: Me | Who has access: Anyone.
  * Run Team setup again after deploying to get the join code.
  *
- * Script properties: TOKEN (auth; unset = open), ID_PREFIX, ID_SEQ, SEARCH_SEQ.
+ * Script properties: TOKEN (auth; unset = open), ID_PREFIX, ID_SEQ, SEARCH_SEQ,
+ * GITHUB_REPO / GITHUB_TOKEN (menu Connect GitHub), LAST_DISPATCH.
  */
 
-const BRIDGE_VERSION = 6;
+const BRIDGE_VERSION = 7;
 const SCHEMA_VERSION = 4;
 const HRC_SHEET_NAME = "Archive";
 const HRC_HEADERS = [
@@ -37,10 +38,13 @@ const UPDATE_KEYS = [
 ];
 const SEARCHES_TAB = "Searches";
 const CONFIG_TAB = "Config";
+const TEXTS_TAB = "Texts";
+const TEXT_CELL = 45000; // two cells per text, 90,000 chars max
+const DISPATCH_GAP_MS = 5 * 60 * 1000;
 const SEARCH_HEADERS = [
   "ID", "Project", "Lane", "Name", "Query", "Interval Mins", "Owner", "Enabled", "Updated At"
 ];
-const RESERVED_TABS = [HRC_SHEET_NAME, SEARCHES_TAB, CONFIG_TAB].map((name) => name.toLowerCase());
+const RESERVED_TABS = [HRC_SHEET_NAME, SEARCHES_TAB, CONFIG_TAB, TEXTS_TAB].map((name) => name.toLowerCase());
 const CANARY_MAPPED = [
   "canary_item_id", "url", "title_or_summary", "snippet_or_context", "notes", "tags",
   "saved_by", "saved_at", "query_bucket", "project_id", "source_type", "doc_language",
@@ -56,6 +60,7 @@ function doGet(e) {
     if (!action) return describeExtensionSheet(params);
     if (action === "list") return listItems(params);
     if (action === "health") return healthCheck();
+    if (action === "getStatus") return getStatus();
     return jsonResponse({ ok: false, error: "Unknown action: " + action });
   } catch (err) {
     return jsonResponse({
@@ -99,7 +104,10 @@ function doPost(e) {
     putTab: putTab,
     listSearches: listSearches,
     upsertSearch: upsertSearch,
-    getConfig: getConfig
+    getConfig: getConfig,
+    getStatus: getStatus,
+    putText: putText,
+    getTexts: getTexts
   };
   const push = !action && body.tab && Array.isArray(body.rows);
   const handler = canary ? canaryAdd : push ? putTab : action ? handlers[action] : extensionAddLegacy;
@@ -325,13 +333,14 @@ function extensionArchiveItem(rowData, capture, body) {
     "Project": rowData.Project || capture.project || "",
     "Language": rowData.Language || capture.language || "",
     "Published At": rowData["Published At"] || capture.publishDate || "",
-    "Extra": captureExtra(capture)
+    "Extra": captureExtra(capture),
+    "_text": typeof capture.text === "string" ? capture.text : ""
   });
 }
 
 // Site-specific capture fields (tweetId, viewCount, ogTitle, ...) that have no column of their own.
 const CAPTURE_MAPPED = ["id", "url", "title", "notes", "timestamp", "savedBy", "query", "snippet",
-  "sourceType", "source", "project", "language", "publishDate"];
+  "sourceType", "source", "project", "language", "publishDate", "text"];
 function captureExtra(capture) {
   const extra = {};
   Object.keys(capture).forEach((key) => {
@@ -447,6 +456,7 @@ function saveArchive(list, strict) {
   }
 
   const results = [];
+  const texts = {};
   for (const fields of list) {
     const url = String(fields.URL || "").trim();
     if (!url) {
@@ -458,6 +468,7 @@ function saveArchive(list, strict) {
     if (id && byId[id] !== undefined) {
       if (String(data[byId[id]][1] || "") === url) {
         results.push({ id, ok: true, created: false });
+        if (fields._text) texts[id] = fields._text;
         continue;
       }
       if (strict) {
@@ -474,6 +485,7 @@ function saveArchive(list, strict) {
         if (i < existing) sheet.getRange(i + 1, c["Saved By"] + 1).setValue(safe(data[i][c["Saved By"]]));
       }
       results.push({ id: String(data[i][0]), ok: true, created: false });
+      if (fields._text) texts[String(data[i][0])] = fields._text;
       continue;
     }
     if (id && byId[id] !== undefined) reassignedFrom = id;
@@ -485,6 +497,7 @@ function saveArchive(list, strict) {
     fields.URL = url;
     data.push(headers.map((header) => fields[header] === undefined ? "" : safe(fields[header])));
     byId[id] = byUrl[url] = data.length - 1;
+    if (fields._text) texts[id] = fields._text;
     results.push(reassignedFrom
       ? { id, ok: true, created: true, reassigned_from: reassignedFrom }
       : { id, ok: true, created: true });
@@ -495,7 +508,90 @@ function saveArchive(list, strict) {
     sheet.getRange(sheet.getLastRow() + 1, 1, added.length, headers.length).setValues(added);
     SpreadsheetApp.flush();
   }
+  saveTexts(texts, false);
+  if (added.length > 0) dispatchRun();
   return results;
+}
+
+// ── Page text (Texts tab) and run trigger ───────────────────────────────────
+
+// ids: {id: text}. First text wins unless replace. One read of the ID column.
+function saveTexts(texts, replace) {
+  const ids = Object.keys(texts).filter((id) => texts[id]);
+  if (ids.length === 0) return;
+  const sheet = ensureTab(TEXTS_TAB, ["ID", "Text 1", "Text 2", "Saved At"]);
+  const col = sheet.getLastRow() > 1 ? sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getValues() : [];
+  const at = {};
+  col.forEach((row, i) => { at[String(row[0])] = i + 2; });
+  const now = new Date().toISOString();
+  ids.forEach((id) => {
+    const text = String(texts[id]).slice(0, 2 * TEXT_CELL);
+    const row = [id, safe(text.slice(0, TEXT_CELL)), safe(text.slice(TEXT_CELL)), now];
+    if (at[id] === undefined) {
+      sheet.getRange(sheet.getLastRow() + 1, 1, 1, 1).setNumberFormat("@");
+      sheet.getRange(sheet.getLastRow() + 1, 1, 1, 4).setValues([row]);
+    } else if (replace) {
+      sheet.getRange(at[id], 1, 1, 4).setValues([row]);
+    }
+  });
+}
+
+function putText(body) {
+  if (!body.id || typeof body.text !== "string" || !body.text) {
+    return jsonResponse({ ok: false, error: "id and text are required" });
+  }
+  saveTexts({ [String(body.id)]: body.text }, body.replace === true);
+  return jsonResponse({ ok: true });
+}
+
+function getTexts(body) {
+  const want = {};
+  (Array.isArray(body.ids) ? body.ids : []).slice(0, 50).forEach((id) => { want[String(id)] = true; });
+  const sheet = getSpreadsheet().getSheetByName(TEXTS_TAB);
+  const rows = sheet && sheet.getLastRow() > 1 ? sheet.getRange(2, 1, sheet.getLastRow() - 1, 3).getValues() : [];
+  const texts = rows.filter((row) => want[String(row[0])])
+    .map((row) => ({ id: String(row[0]), text: String(row[1] || "") + String(row[2] || "") }));
+  return jsonResponse({ ok: true, texts });
+}
+
+function textIds() {
+  const sheet = getSpreadsheet().getSheetByName(TEXTS_TAB);
+  const ids = {};
+  if (sheet && sheet.getLastRow() > 1) {
+    sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getValues().forEach((row) => { ids[String(row[0])] = true; });
+  }
+  return ids;
+}
+
+function getStatus() {
+  const sheet = getSpreadsheet().getSheetByName("pipeline_status");
+  const status = {};
+  if (sheet && sheet.getLastRow() > 1) {
+    sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getValues().forEach((row) => {
+      if (row[0] !== "") status[String(row[0])] = jsonCellValue(row[1]);
+    });
+  }
+  return jsonResponse({ ok: true, status });
+}
+
+// Asks GitHub to run the pipeline. Never throws; at most one fetch per 5 minutes.
+function dispatchRun() {
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const repo = props.getProperty("GITHUB_REPO");
+    const token = props.getProperty("GITHUB_TOKEN");
+    if (!repo || !token) return;
+    const now = Date.now();
+    if (now - (Number(props.getProperty("LAST_DISPATCH")) || 0) < DISPATCH_GAP_MS) return;
+    props.setProperty("LAST_DISPATCH", String(now));
+    UrlFetchApp.fetch("https://api.github.com/repos/" + repo + "/dispatches", {
+      method: "post",
+      contentType: "application/json",
+      headers: { Authorization: "Bearer " + token, Accept: "application/vnd.github+json" },
+      payload: JSON.stringify({ event_type: "saved" }),
+      muteHttpExceptions: true
+    });
+  } catch (err) {}
 }
 
 const archiveReply = (result) => jsonResponse(result.ok
@@ -538,7 +634,9 @@ function listItems(params) {
   const limit = Math.max(1, parseInt(params.limit || "100", 10) || 100);
   const status = params.status || null;
   const includeLocked = String(params.include_locked) === "true";
+  const withText = textIds();
   let items = data.slice(1).map((row) => rowToObject(row, c)).filter((row) => row.id);
+  items.forEach((item) => { item.has_text = withText[item.id] === true; });
   if (status && status !== "all") {
     items = items.filter((item) => (item.status || "pending") === status);
   }
@@ -850,6 +948,7 @@ function onOpen() {
   SpreadsheetApp.getUi().createMenu("Pipeline")
     .addItem("Team setup", "teamSetup")
     .addItem("Show join code", "showJoinCode")
+    .addItem("Connect GitHub", "connectGithub")
     .addToUi();
 
   const spreadsheet = getSpreadsheet();
@@ -885,4 +984,16 @@ function showJoinCode() {
   }
   const code = Utilities.base64EncodeWebSafe(JSON.stringify({ url, token }));
   ui.alert("Join code", "Share this with your team (the web app must stay deployed):\n\n" + code, ui.ButtonSet.OK);
+}
+
+// Optional: lets a save start a pipeline run. The token needs to create repository_dispatch events.
+function connectGithub() {
+  const ui = SpreadsheetApp.getUi();
+  const props = PropertiesService.getScriptProperties();
+  const repo = ui.prompt("Connect GitHub", "Repository (owner/name):", ui.ButtonSet.OK_CANCEL);
+  if (repo.getSelectedButton() !== ui.Button.OK || !repo.getResponseText().trim()) return;
+  const token = ui.prompt("Connect GitHub", "Token with Contents: read and write on that repo (blank keeps the stored one):", ui.ButtonSet.OK_CANCEL);
+  if (token.getSelectedButton() !== ui.Button.OK) return;
+  props.setProperty("GITHUB_REPO", repo.getResponseText().trim());
+  if (token.getResponseText().trim()) props.setProperty("GITHUB_TOKEN", token.getResponseText().trim());
 }

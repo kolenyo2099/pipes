@@ -1,6 +1,6 @@
 <script>
   import { onMount, tick } from 'svelte'
-  import { tourOpen } from '../stores/app.js'
+  import { tourOpen, onboarding, teamState } from '../stores/app.js'
 
   const STORAGE_KEY = 'canary_tour_v1'
 
@@ -8,32 +8,37 @@
   // target: CSS selector for the element to spotlight (null → centered card)
   const steps = [
     {
-      title: '👋 Welcome to Canary',
-      body:  'This quick tour covers the core workflow — from creating a project to triaging your first events. Takes about 90 seconds.',
+      title: '👋 Welcome to Pipeline',
+      body:  'Save anything to your team sheet, see what is archived and processed in the <strong>Library</strong>, then explore it. Canary monitoring is the optional second half of this tour.',
       target: null,
     },
     {
-      title: '1 · Create a project',
+      title: '1 · Your team Library',
+      body:  'Everything the team saved lives in the <strong>Library</strong>, with its archive and processing state.',
+      target: '[data-tour="nav-library"]',
+    },
+    {
+      title: '2 · Create a Canary project',
       body:  'A <strong>project</strong> bundles your watchlist rules, collected items, and export settings. Hit <strong>"+ New Project"</strong> to get started.',
       target: '[data-tour="project-area"]',
     },
     {
-      title: '2 · Define watchlist rules',
+      title: '3 · Define watchlist rules',
       body:  'Open <strong>Project Settings</strong> and use the <strong>Query Builder</strong> to combine keywords, CAMEO event codes, actor types, and country codes — this shapes exactly what GDELT collects for you.',
       target: '[data-tour="nav-settings"]',
     },
     {
-      title: '3 · Monitor your inbox',
+      title: '4 · Monitor your inbox',
       body:  'Canary polls GDELT every 15 minutes. Matching articles appear in the <strong>Inbox</strong>. Each card shows the headline, actors, event code, location, and a link to the source article.',
       target: '[data-tour="nav-inbox"]',
     },
     {
-      title: '4 · Triage what matters',
+      title: '5 · Triage what matters',
       body:  '<strong>Save</strong> items worth following up — add a tag and notes. <strong>Dismiss</strong> noise to keep the inbox clean. Saved items can be pushed to Google Sheets automatically or exported as JSON.',
       target: null,
     },
     {
-      title: '5 · Filter & explore patterns',
+      title: '6 · Filter & explore patterns',
       body:  'Use the <strong>filter panel</strong> (top-right of Inbox/Saved) to narrow by date range, source type, watchlist bucket, or country codes. The <strong>Timeline</strong> view plots events on a calendar to reveal spikes.',
       target: '[data-tour="nav-timeline"]',
     },
@@ -104,11 +109,13 @@
   }
 
   // ── Auto-show on first launch ─────────────────────────────────────────────────
-  onMount(() => {
-    if (!localStorage.getItem(STORAGE_KEY)) {
-      setTimeout(() => tourOpen.set(true), 900)
-    }
-  })
+  // Never over the welcome screen: wait until boot has looked (teamState set) and onboarding is over.
+  let armed = false
+  onMount(() => { armed = true })
+  $: if (armed && $teamState !== undefined && !$onboarding && !localStorage.getItem(STORAGE_KEY)) {
+    armed = false
+    setTimeout(() => { if (!$onboarding) tourOpen.set(true) }, 900)
+  }
 </script>
 
 <svelte:window on:keydown={handleKeydown} on:resize={reposition} />

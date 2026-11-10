@@ -10,9 +10,16 @@ from pathlib import Path
 
 ROOT = Path(__file__).parent
 os.chdir(ROOT)
+def explorer_url(repo):
+    """GITHUB_REPOSITORY "owner/name" -> its GitHub Pages address; empty when not on GitHub."""
+    owner, _, name = repo.partition("/")
+    return f"https://{owner}.github.io/{name}/" if owner and name else ""
+
+
 DRY = "--dry-run" in sys.argv
 now = lambda: datetime.now(timezone.utc).isoformat(timespec="seconds")
-st = dict(started_at=now(), finished_at="", action="", collected=0, submitted=0, articles_total=0, pulled=0, ok=True, error="")
+st = dict(started_at=now(), finished_at="", action="", collected=0, submitted=0, articles_total=0, pulled=0, ok=True, error="",
+          explorer_url=explorer_url(os.environ.get("GITHUB_REPOSITORY", "")))
 
 
 def stage(*cmd):
@@ -84,4 +91,5 @@ def main():
     sys.exit(0 if st["ok"] else 1)
 
 
-main()
+if __name__ == "__main__":
+    main()

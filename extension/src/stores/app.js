@@ -1,12 +1,16 @@
-import { writable } from 'svelte/store'
+import { writable, derived } from 'svelte/store'
 
 // ── Navigation ─────────────────────────────────────────────────────────────────
-// Views: 'inbox' | 'saved' | 'dismissed' | 'settings' | 'logs' | 'new-project'
-export const currentView = writable('inbox')
+// Views: 'library' (home) | 'explore' | 'archive' | 'team-searches' | 'team' | Canary: 'inbox' | 'saved' | 'dismissed' | 'timeline' | 'settings' | 'logs' | 'new-project'
+export const currentView = writable('library')
 export const currentProjectId = writable(null)
 
 // ── Data ───────────────────────────────────────────────────────────────────────
 export const projects = writable([])
+// Joined team ({url, token, name}): null when not joined, undefined until boot has looked.
+export const teamState = writable(undefined)
+// First run = no team and no Canary project: home shows the welcome screen and the tour waits.
+export const onboarding = derived([teamState, projects], ([t, p]) => t === null && p.length === 0)
 export const currentProject = writable(null)
 export const items = writable([])
 export const itemsTotal = writable(0)

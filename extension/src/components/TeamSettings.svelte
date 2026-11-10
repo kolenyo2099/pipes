@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte'
   import { api } from '../api.js'
-  import { notify } from '../stores/app.js'
+  import { notify, teamState } from '../stores/app.js'
 
   let team = null
   let outbox = null
@@ -14,6 +14,7 @@
     const result = await api.getTeamStatus()
     if (!result.ok) return notify('error', result.error)
     ;({ team, outbox } = result.data)
+    teamState.set(team)
     name = team?.name || name
     check = ''
     if (team) {

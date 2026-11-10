@@ -2,6 +2,8 @@
   import NlpSettings from '../components/NlpSettings.svelte'
   import { onMount } from 'svelte'
   import { api } from '../api.js'
+  import { getTeam } from '../backend/team.js'
+  import { shareProject, unshare } from '../backend/searches.js'
   import {
     currentProjectId, currentProject, projects, currentView, notify,
   } from '../stores/app.js'
@@ -203,6 +205,22 @@
   async function saveBudget(lane, per) {
     const result = await api.setSocialBudget(lane, per)
     if (!result.ok) notify('error', result.error)
+  }
+
+  // ── Share with team ───────────────────────────────────────────────────────
+  let team = null
+  let sharing = false
+  getTeam().then(t => { team = t })
+  async function toggleShare(stop) {
+    sharing = true
+    try {
+      if (stop) await unshare({ id: $currentProject.shared_search_id })
+      else await shareProject($currentProject, team.name)
+      const fresh = await api.getProject($currentProjectId)
+      if (fresh.ok) currentProject.set(fresh.data)
+      notify('success', stop ? 'Stopped sharing' : 'Shared with the team')
+    } catch (e) { notify('error', e.message) }
+    sharing = false
   }
 
   onMount(async () => {
@@ -737,6 +755,17 @@
       {saving ? 'Saving…' : 'Save Changes'}
     </button>
   </div>
+
+  {#if team}
+    <section class="step">
+      <h2 class="step-title">Share with team</h2>
+      <p class="step-hint">Only this search setup (rules, countries, sources, intervals) is shared, never the inbox, your triage or any credentials. Save your changes first; teammates who subscribe query the sources from their own browser.</p>
+      <button class="btn-cancel" disabled={sharing} on:click={() => toggleShare(false)}>{$currentProject?.shared_search_id ? 'Update shared version' : 'Share with team'}</button>
+      {#if $currentProject?.shared_search_id}
+        <button class="btn-cancel" disabled={sharing} on:click={() => toggleShare(true)}>Stop sharing</button>
+      {/if}
+    </section>
+  {/if}
 
   <!-- Danger zone -->
   <section class="danger-zone">

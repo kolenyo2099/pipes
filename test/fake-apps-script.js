@@ -58,6 +58,9 @@ function load({ sheets, props = {}, url = 'https://script.test/exec' } = {}) {
   const properties = { ...props };
   let uuid = 0;
   const alerts = [];
+  const fetches = [];
+  const prompts = [];
+  const fetcher = { fail: false };
   const context = {
     console, Date, JSON, Math, Number, Object, String, Array,
     ContentService: {
@@ -75,7 +78,12 @@ function load({ sheets, props = {}, url = 'https://script.test/exec' } = {}) {
       getActiveSpreadsheet: () => spreadsheet,
       flush() {},
       getUi: () => ({
-        ButtonSet: { OK: 'OK' },
+        ButtonSet: { OK: 'OK', OK_CANCEL: 'OK_CANCEL' },
+        Button: { OK: 'OK', CANCEL: 'CANCEL' },
+        prompt: () => { // prompts.push({ button?, text }) beforehand; answers in order
+          const answer = prompts.shift() || { button: 'CANCEL', text: '' };
+          return { getSelectedButton: () => answer.button || 'OK', getResponseText: () => answer.text };
+        },
         createMenu: () => ({ addItem() { return this; }, addToUi() {} }),
         alert: (...args) => alerts.push(args)
       })
@@ -83,6 +91,13 @@ function load({ sheets, props = {}, url = 'https://script.test/exec' } = {}) {
     Utilities: {
       getUuid: () => `0000-${String(++uuid).padStart(4, '0')}-aaaa`,
       base64EncodeWebSafe: (text) => Buffer.from(text).toString('base64url')
+    },
+    UrlFetchApp: {
+      fetch: (url, options) => {
+        fetches.push({ url, options });
+        if (fetcher.fail) throw new Error('network down');
+        return { getResponseCode: () => 204 };
+      }
     },
     ScriptApp: { getService: () => ({ getUrl: () => url }) }
   };
@@ -94,7 +109,7 @@ function load({ sheets, props = {}, url = 'https://script.test/exec' } = {}) {
   const archive = () => spreadsheet.getSheetByName('Archive');
   const col = (name) => archive().rows[0].indexOf(name);
   const cell = (row, name) => archive().rows[row][col(name)];
-  return { context, spreadsheet, properties, alerts, get, post, postText, archive, col, cell };
+  return { context, spreadsheet, properties, alerts, fetches, prompts, fetcher, get, post, postText, archive, col, cell };
 }
 
 module.exports = { load, Sheet, HRC, EXT };

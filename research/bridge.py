@@ -15,6 +15,7 @@ from urllib.request import Request, urlopen
 
 HERE = Path(__file__).parent
 HAIKU = HERE / "out" / "haiku"
+TEXTS = HERE / "out" / "texts"
 CHUNK = 5000
 LEGACY = ["l", "url", "title_or_summary", "snippet_or_context", "project_id", "saved_at", "saved_by",
           "source_type", "datetime_utc", "doc_language", "tags"]
@@ -68,6 +69,29 @@ def read_csv(path):
         return list(csv.DictReader(f))
 
 
+def cache_texts(pairs, texts_dir=TEXTS):
+    """pairs: [(l, text)]. Writes <l>.article.txt, the file pipeline.get_text reads for an already-fetched
+    article, unless that article is cached already. Returns how many were written."""
+    texts_dir.mkdir(parents=True, exist_ok=True)
+    n = 0
+    for l, text in pairs:
+        if text and not next(texts_dir.glob(f"{l}.*.txt"), None):
+            (texts_dir / f"{l}.article.txt").write_text(text, "utf-8")
+            n += 1
+    return n
+
+
+def pull_texts(items):
+    """Page text saved by the extension: fetch what is not cached yet so extract.py never refetches those URLs."""
+    want = {i["id"]: to_legacy(i)["l"] for i in items
+            if i.get("url") and i.get("has_text") and not next(TEXTS.glob(f"{to_legacy(i)['l']}.*.txt"), None)}
+    ids, n = list(want), 0
+    for k in range(0, len(ids), 50):
+        got = post({"action": "getTexts", "ids": ids[k:k + 50]})["texts"]
+        n += cache_texts([(want[t["id"]], t["text"]) for t in got])
+    print(f"texts {n}")
+
+
 def pull(a):
     items, offset = [], 0
     while True:
@@ -83,6 +107,7 @@ def pull(a):
         w.writeheader()
         w.writerows(rows)
     print(f"pulled {len(rows)}")
+    pull_texts(items)
 
 
 def put_tab(tab, rows):

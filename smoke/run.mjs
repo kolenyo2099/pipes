@@ -5,9 +5,18 @@ import { spawn } from 'node:child_process'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
+import fs from 'node:fs'
+import os from 'node:os'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
-const dist = path.join(here, '..', 'extension', 'dist')
+const built = path.join(here, '..', 'extension', 'dist')
+// Headless Chromium cannot click Chrome's permission prompt, so load a copy with all-sites access already granted.
+const dist = fs.mkdtempSync(path.join(os.tmpdir(), 'pipeline-dist-'))
+fs.cpSync(built, dist, { recursive: true })
+const manifest = JSON.parse(fs.readFileSync(path.join(dist, 'manifest.json'), 'utf8'))
+manifest.host_permissions.push('<all_urls>')
+fs.writeFileSync(path.join(dist, 'manifest.json'), JSON.stringify(manifest))
+const shots = process.env.SMOKE_SHOTS  // optional folder for screenshots of each view
 const PORT = 8787, BRIDGE = `http://127.0.0.1:${PORT}/`
 const results = []
 const check = (name, ok, detail = '') => { results.push(ok); console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${detail ? ' — ' + detail : ''}`) }
@@ -109,6 +118,42 @@ try {
   const recovered = await until(async () => (await archive()).some(r => r.URL === 'https://down.test/1'))
   check('retry delivers after the bridge recovers', !!recovered)
   check('  badge clears', !!(await until(async () => (await sw.evaluate(() => chrome.action.getBadgeText({}))) === '')))
+
+  // The product views, against the same sheet: Library, Archive (real capture of a local page), Explore.
+  const shot = async name => { if (shots) await app.screenshot({ path: path.join(shots, name + '.png') }) }
+  const article = BRIDGE + '_article'
+  await sw.evaluate(u => pipelineEnqueue({ kind: 'capture', capture: { url: u, title: 'Smoke article', sourceType: 'page', text: 'Page text sent at save time.' } }), article)
+  const saved = await until(async () => (await archive()).find(r => r.URL === article))
+  check('page save with text reaches the sheet', !!saved && ((await sheet()).Texts || []).some(r => r[0] === saved.ID && /save time/.test(r[1])), saved && saved.ID)
+  await fetch(BRIDGE, { method: 'POST', body: JSON.stringify({ token: 'smoke-token', action: 'putTab', tab: 'pipeline_status', reset: true,
+    rows: [['key', 'value'], ['explorer_url', article], ['finished_at', new Date().toISOString()], ['articles_total', '42'], ['ok', 'True']] }) })
+  await app.reload()
+  await app.waitForTimeout(1500)
+  if (await app.getByText('Skip tour').count()) await app.getByText('Skip tour').click()
+  await app.getByRole('button', { name: /Library/ }).first().click()
+  check('Library lists the team\'s saves', !!(await until(async () => (await app.getByText('Smoke article').count()) > 0 && (await app.getByText('Story 1').count()) > 0, 8000)))
+  await shot('library')
+  await app.getByRole('button', { name: /^.{0,3}Archive$/ }).first().click()
+  const card = app.locator('.card', { hasText: 'Smoke article' })
+  check('Archive view lists pending items', !!(await until(async () => (await card.count()) > 0, 8000)))
+  await shot('archive')
+  if (await card.count()) {
+    await card.getByRole('button', { name: 'Archive' }).click()
+    const done = await until(async () => { const r = (await archive()).find(r => r.URL === article); return r && r.Status !== 'pending' && r }, 90000)
+    check('evidence capture completes', !!done && !!done['Evidence Hash'], done ? `${done.Status} by ${done['Captured By']} · ${done['Result Metadata']}`.slice(0, 300) : 'timed out')
+    if (done) {
+      const files = JSON.parse(done['Evidence Files'] || '[]').map(f => f.name)
+      check('  screenshot, PDF, MHTML, HAR, DOM, hashes, manifest', ['screenshot.png', 'page.pdf', 'snapshot.mhtml', 'network.har', 'dom.html', 'hashes.txt', 'manifest.json'].every(n => files.includes(n)), files.join(', '))
+      check('  row unlocked and stamped', !done['Locked By'] && !!done['Captured At'] && !!done['Archived At'])
+    }
+    await shot('archive-done')
+  }
+  await app.getByRole('button', { name: /Explore/ }).first().click()
+  check('Explore embeds the explorer', !!(await until(async () => (await app.locator(`iframe[src="${article}"]`).count()) > 0, 8000)), (await app.locator('main').innerText()).slice(0, 120).replace(/\s+/g, ' '))
+  await shot('explore')
+  await app.getByRole('button', { name: /Team searches/ }).first().click()
+  await app.waitForTimeout(800)
+  await shot('team-searches')
 
   // Wrong token: parked immediately, no retries.
   await setTeam('wrong')

@@ -14,10 +14,13 @@ With no `TOKEN` the bridge is open (v5 behaviour) so older clients keep working;
 
 Other script properties: `ID_PREFIX` (default `ITEM`), `ID_SEQ` and `SEARCH_SEQ` (counters, managed by the bridge).
 
+**Connect GitHub** (optional): menu **Pipeline → Connect GitHub** stores `GITHUB_REPO` (`owner/name`) and `GITHUB_TOKEN` (blank keeps the stored one). After a save that creates an Archive row, the bridge sends a `repository_dispatch` `saved` event, at most one per 5 minutes (`LAST_DISPATCH`), so the pipeline runs right away. Failures are ignored.
+
 ## Sheets
 
 - `Archive`: columns A–N are the HRC layout. Extended columns follow (Saved By … Extra) and are added automatically.
 - `Searches`: shared Canary search definitions. `Config`: Key / Value, edited by humans.
+- `Texts`: page text sent by the extension (`ID`, `Text 1`, `Text 2`, `Saved At`; 90,000 chars max). Reserved.
 - Any other tab is a plain Save to Sheets worksheet or a push target.
 
 ## Actions
@@ -27,6 +30,7 @@ POST JSON (raw body, any content type):
 - Extension: `data`, `dataBatch`, `setHeaders`, `getSheets`, `getHeaders`, or no action with legacy fields.
 - HRC: `add`, `updateStatus`, `updateMany` (accepts `fields` and evidence shorthands), `lock`, `unlock`, `clearStaleLocks`, `list`, `health`.
 - Canary: no action, `{headers[], values[]}`. Replies with text `OK`, `Unauthorized` or `ERROR: ...`.
+- Page text and status: `putText`, `getTexts` (max 50 ids), `getStatus` (the `pipeline_status` tab as an object); `list` items carry `has_text`.
 - Push: `putTab` or no action with `{tab, rows, reset}`. Reserved tabs are refused.
 - Shared: `listSearches`, `upsertSearch`, `getConfig`.
 
@@ -44,13 +48,19 @@ No dependencies. Runs `test/bridge.test.js` against a fake SpreadsheetApp in `no
 
 ## Extension
 
-`extension/` is the unified Chrome extension: the canary-lite base, Save to Sheets capture (Google, X, YouTube, Facebook, right-click page/link/PDF/image), and one outbox that delivers every save to the team bridge. Canary inboxes stay in each browser; only saved items are sent.
+`extension/` is the Pipeline Chrome extension. One app, four parts, all coordinated through the team sheet:
+
+- **Library** (home): everything the team saved, with who saved it and whether it is archived and processed.
+- **Save**: buttons on Google, X, YouTube and Facebook, right-click save for pages, links, PDFs and images. Page text is sent with the save. One outbox delivers everything and retries.
+- **Archive**: HRC Archiver's capture engine. Screenshot, PDF, MHTML, HAR, DOM, SHA-256 hashes and an RFC 3161 timestamp go to `Downloads/Pipeline/<id>/` on the capturing machine; the sheet gets the hashes. Rows are locked while a teammate captures them.
+- **Explore**: the entity explorer published by the research pipeline, with the time of the last run.
+- **Monitor (Canary)**: optional news and social monitoring. Inboxes stay in each browser; a monitoring setup can be shared with the team under Team searches.
 
 ```
 cd extension && npm install && npm run build
 ```
 
-Load `extension/dist` with "Load unpacked" in `chrome://extensions`, open the extension, Settings → Team, paste the join code and your name. Tests: `npx vitest run`. Save flow contract: `docs/extension-save-contract.md`.
+Load `extension/dist` with "Load unpacked" in `chrome://extensions`, open the extension and paste the join code and your name. Tests: `npx vitest run`. Contracts: `docs/product-contract.md`, `docs/extension-save-contract.md`.
 
 ## Research pipeline
 
@@ -58,7 +68,7 @@ Load `extension/dist` with "Load unpacked" in `chrome://extensions`, open the ex
 
 ## Smoke test
 
-`smoke/run.mjs` loads the built extension in headless Chromium against `smoke/fake-bridge.js` (the real `bridge/Code.gs` on an in-memory sheet) and checks the Team card, Google capture, Save all, canary saves, retry/park and wrong-token handling.
+`smoke/run.mjs` loads the built extension in headless Chromium against `smoke/fake-bridge.js` (the real `bridge/Code.gs` on an in-memory sheet) and checks joining a team, Google capture, Save all, canary saves, retry/park, wrong-token handling, the Library, a real evidence capture of a local page, and Explore. Set `SMOKE_SHOTS=<folder>` to save screenshots of each view.
 
 ```
 cd extension && npm run build && cd ../smoke && npm install && npx playwright install chromium && node run.mjs

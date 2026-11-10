@@ -83,6 +83,8 @@ git push -f <your repo url> data
 
 Without seeding, the first tick starts from scratch: it submits every saved item as one batch.
 
+**Page text and starting runs on save (optional)**: the extension sends the text of the page with each save, and the bridge keeps it in a `Texts` tab. `bridge.py pull` copies it into `out/texts` (printing `texts N`), so `extract.py` does not have to fetch those URLs again (many sites block a server fetch, the browser already has the page). To start a run right after a save instead of waiting up to 30 minutes, in the team sheet use **Pipeline → Connect GitHub**: enter `owner/name` and a fine-grained token for that repo with Contents: read and write (what creating a `repository_dispatch` event needs; a token allowed to create such events works too). The bridge sends at most one event per 5 minutes and a failure never blocks a save. The `pipeline_status` tab also carries `explorer_url` (the Pages address) for the extension.
+
 **What a tick does**: pull saved items from the bridge, then `extract.py --auto` either submits a Haiku batch for new items, reports `pending`, or collects a finished batch. Only when articles were collected does it run `amounts.py`, `llm_merge.py`, `normalize.py`, `build_data.py`, push the results tabs to the sheet, mark the items "Processed At", and deploy the explorer to Pages. Every tick writes a `pipeline_status` tab (when it ran, what happened, counts, errors).
 
 **State** lives on the orphan `data` branch: one commit, force-pushed after every tick (even a failed one, so a submitted batch id is never lost), holding `out/haiku`, `out/texts` and `data/data.js`. `data/` is gitignored on the main branch because `data.js` is a build artifact.

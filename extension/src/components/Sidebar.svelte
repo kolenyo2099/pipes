@@ -84,20 +84,27 @@
 <aside class="sidebar">
   <!-- Logo -->
   <div class="sidebar-logo">
-    <img src="/canary.png" alt="Canary" class="logo-img" />
+    <img src="/canary.png" alt="Pipeline" class="logo-img" />
     <div class="logo-text-block">
-      <span class="logo-text">Canary</span>
-      <span class="logo-sub">Conflict Alert &amp; News Aggregator</span>
+      <span class="logo-text">Pipeline</span>
+      <span class="logo-sub">Save · Archive · Explore</span>
     </div>
   </div>
 
+  <!-- Team home: always visible, independent of Canary projects -->
+  <nav class="nav team-nav">
+    <button class="nav-item" class:active={$currentView === 'library'} data-tour="nav-library" on:click={() => setView('library')}><span class="nav-icon">📚</span>Library</button>
+    <button class="nav-item" class:active={$currentView === 'explore'} on:click={() => setView('explore')}><span class="nav-icon">🧭</span>Explore</button>
+    <button class="nav-item" class:active={$currentView === 'archive'} on:click={() => setView('archive')}><span class="nav-icon">🗄</span>Archive</button>
+  </nav>
+
+  <!-- Project switcher -->
+  <div class="section-label">Monitor (Canary)</div>
   <!-- GDELT Reference guide trigger -->
   <button class="btn-guide" on:click={() => guideOpen.set(true)} title="GDELT reference guide">
     📖 GDELT Reference
   </button>
 
-  <!-- Project switcher -->
-  <div class="section-label">Project</div>
   <div class="project-switcher" data-tour="project-area">
     {#if $projects.length === 0}
       <p class="empty-hint">No projects yet</p>
@@ -201,6 +208,10 @@
     </div>
   {/if}
 
+  <nav class="nav">
+    <button class="nav-item" class:active={$currentView === 'team-searches'} on:click={() => setView('team-searches')}><span class="nav-icon">🔎</span>Team searches</button>
+  </nav>
+
   <!-- Team works without any Canary project: browser capture only needs the join code -->
   <div class="section-label">Team</div>
   <div class="quick-actions">
@@ -220,7 +231,7 @@
     <button class="btn-tour" on:click={() => tourOpen.set(true)} title="Replay tour">
       ? Tour
     </button>
-    <button class="btn-about" on:click={() => aboutOpen.set(true)} title="About Canary">
+    <button class="btn-about" on:click={() => aboutOpen.set(true)} title="About Pipeline">
       ℹ About
     </button>
   </div>
@@ -290,6 +301,7 @@
   .btn-new-project:hover { background: rgba(42, 36, 16, 0.1); }
   .empty-hint { font-size: 0.78rem; margin: 0; opacity: 0.75; }
 
+  .team-nav { padding-top: 0.5rem; }
   .nav { display: flex; flex-direction: column; gap: 2px; padding: 0 0.5rem; }
   .nav-item {
     align-items: center;

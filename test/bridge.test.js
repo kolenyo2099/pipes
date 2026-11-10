@@ -21,7 +21,7 @@ test('token is required on POST and GET when TOKEN is set (trimmed compare)', ()
 test('without TOKEN the bridge is open and says so', () => {
   const b = load();
   assert.equal(b.get({}).auth, 'open');
-  assert.equal(b.get({}).bridge_version, 6);
+  assert.equal(b.get({}).bridge_version, 7);
   assert.equal(b.get({ action: 'health' }).auth, 'open');
   assert.equal(b.post({ action: 'getSheets' }).ok, true);
 });
@@ -258,7 +258,7 @@ test('list and health shapes include extended fields', () => {
   assert.equal(viaPost.total, 1);
   for (const health of [b.get({ token: 't', action: 'health' }), b.post({ token: 't', action: 'health' })]) {
     assert.equal(health.schema_version, 4);
-    assert.equal(health.bridge_version, 6);
+    assert.equal(health.bridge_version, 7);
     assert.equal(health.item_count, 1);
     assert.equal(health.sheet_name, 'Archive');
     assert.equal(health.spreadsheet_name, 'Team sheet');
@@ -349,4 +349,109 @@ test('onOpen keeps header seeding', () => {
   const archived = load({ sheets: [new Sheet('Archive')] });
   archived.context.onOpen();
   assert.deepEqual(archived.archive().rows[0], [...HRC, ...EXT]);
+});
+
+const capture = (url, extra = {}) => ({ action: 'data', sheetName: 'Archive', capture: { url, ...extra } });
+const textRows = (b) => b.spreadsheet.getSheetByName('Texts').rows.slice(1);
+
+test('page text: stored in Texts across two cells, capped at 90k, never in Extra', () => {
+  const b = load();
+  const text = 'a'.repeat(45000) + 'b'.repeat(45000) + 'c'.repeat(10);
+  const saved = b.post(capture('https://x.test/t', { text, tweetId: '9' }));
+  const [row] = textRows(b);
+  assert.deepEqual(row.slice(0, 1), [saved.id]);
+  assert.equal(row[1], 'a'.repeat(45000));
+  assert.equal(row[2], 'b'.repeat(45000));
+  assert.equal(b.cell(1, 'Extra'), '{"tweetId":"9"}');
+  assert.equal(b.post({ action: 'getTexts', ids: [saved.id] }).texts[0].text.length, 90000);
+});
+
+test('page text: first wins (also when the URL already existed), putText replace overwrites', () => {
+  const b = load();
+  const first = b.post(capture('https://x.test/t', { text: 'one' }));
+  const again = b.post(capture('https://x.test/t', { text: 'two', savedBy: 'Ana' }));
+  assert.equal(again.created, false);
+  assert.equal(again.id, first.id);
+  assert.equal(textRows(b).length, 1);
+  assert.equal(textRows(b)[0][1], 'one');
+  assert.deepEqual(b.post({ action: 'putText', id: first.id, text: 'three' }), { ok: true });
+  assert.equal(textRows(b)[0][1], 'one');
+  b.post({ action: 'putText', id: first.id, text: 'three', replace: true });
+  assert.equal(textRows(b)[0][1], 'three');
+  // dedupe path for a URL saved earlier without text gets its text
+  const bare = b.post(capture('https://x.test/bare'));
+  b.post(capture('https://x.test/bare', { text: 'late' }));
+  assert.equal(b.post({ action: 'getTexts', ids: [bare.id] }).texts[0].text, 'late');
+  assert.equal(b.post({ action: 'putText', id: '', text: 'x' }).ok, false);
+});
+
+test('dataBatch stores text against the final (reassigned) id', () => {
+  const b = load({ sheets: archiveWith(['E-1', 'https://x.test/old']) });
+  const saved = b.post({ action: 'dataBatch', sheetName: 'Archive', items: [
+    { capture: { id: 'E-1', url: 'https://x.test/new', text: 'body' } }] });
+  assert.equal(textRows(b)[0][0], saved.results[0].id);
+  assert.notEqual(saved.results[0].id, 'E-1');
+});
+
+test('getTexts returns at most 50 and only known ids; list items carry has_text', () => {
+  const b = load();
+  const ids = [];
+  for (let i = 0; i < 55; i++) ids.push(b.post(capture('https://x.test/' + i, { text: 't' + i })).id);
+  b.post(capture('https://x.test/none'));
+  assert.equal(b.post({ action: 'getTexts', ids }).texts.length, 50);
+  assert.deepEqual(b.post({ action: 'getTexts', ids: ['nope'] }).texts, []);
+  const items = b.post({ action: 'list', limit: 100 }).items;
+  assert.equal(items.filter((i) => i.has_text).length, 55);
+  assert.equal(items.find((i) => i.url === 'https://x.test/none').has_text, false);
+  assert.equal(load().post({ action: 'getTexts', ids: ['a'] }).texts.length, 0); // no Texts tab yet
+});
+
+test('getStatus reads pipeline_status; empty when the tab is absent', () => {
+  assert.deepEqual(load().post({ action: 'getStatus' }), { ok: true, status: {} });
+  const b = load({ sheets: [new Sheet('pipeline_status', [['key', 'value'], ['ok', 'True'], ['explorer_url', 'https://a.github.io/b/']])] });
+  assert.deepEqual(b.post({ action: 'getStatus' }).status, { ok: 'True', explorer_url: 'https://a.github.io/b/' });
+});
+
+test('run trigger: fires once, throttled for 5 minutes, skipped when unconfigured, never fails the save', () => {
+  const props = { GITHUB_REPO: 'me/repo', GITHUB_TOKEN: 'tok' };
+  const b = load({ props });
+  b.post(capture('https://x.test/1'));
+  b.post(capture('https://x.test/1', { savedBy: 'Ana' })); // no new row: no dispatch
+  b.post(capture('https://x.test/2'));
+  assert.equal(b.fetches.length, 1);
+  assert.equal(b.fetches[0].url, 'https://api.github.com/repos/me/repo/dispatches');
+  assert.equal(b.fetches[0].options.headers.Authorization, 'Bearer tok');
+  assert.deepEqual(JSON.parse(b.fetches[0].options.payload), { event_type: 'saved' });
+  assert.equal(b.fetches[0].options.muteHttpExceptions, true);
+  b.properties.LAST_DISPATCH = String(Date.now() - 6 * 60 * 1000);
+  b.post(item('A-1', 'https://x.test/3'));
+  assert.equal(b.fetches.length, 2);
+  const open = load();
+  open.post(capture('https://x.test/1'));
+  assert.equal(open.fetches.length, 0);
+  const down = load({ props });
+  down.fetcher.fail = true;
+  assert.equal(down.post(capture('https://x.test/1')).created, true);
+  assert.equal(down.archive().rows.length, 2);
+  const canary = load({ props });
+  assert.equal(canary.postText({ headers: ['url'], values: ['https://x.test/c'] }), 'OK');
+  assert.equal(canary.fetches.length, 1);
+});
+
+test('Connect GitHub stores repo and token; blank token keeps the stored one', () => {
+  const b = load({ props: { GITHUB_TOKEN: 'old' } });
+  b.prompts.push({ text: ' me/repo ' }, { text: '' });
+  b.context.connectGithub();
+  assert.equal(b.properties.GITHUB_REPO, 'me/repo');
+  assert.equal(b.properties.GITHUB_TOKEN, 'old');
+  b.prompts.push({ text: 'me/repo' }, { text: 'new' });
+  b.context.connectGithub();
+  assert.equal(b.properties.GITHUB_TOKEN, 'new');
+});
+
+test('Texts is reserved for putTab', () => {
+  const b = load({ props: { TOKEN: 't' } });
+  const r = b.post({ action: 'putTab', token: 't', tab: 'texts', rows: [['a']] });
+  assert.equal(r.ok, false);
+  assert.match(r.error, /reserved/);
 });

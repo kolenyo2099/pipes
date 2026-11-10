@@ -128,4 +128,14 @@ describe('ProjectSettings Media Cloud rule transaction', () => {
     expect(mediaCloudRule.logic.mediacloud_collections).toEqual([collectionB])
     expect(committed.mediacloud_collections).toEqual([collectionB])
   })
+
+  it('offers sharing only once a team is joined', async () => {
+    component = mount(ProjectSettings, { target: document.getElementById('target') })
+    await vi.waitFor(() => expect(document.body.textContent).toContain('Dutch coverage'))
+    expect(document.body.textContent).not.toContain('Share with team')
+    vi.stubGlobal('chrome', { storage: { local: { get: async () => ({ pipelineTeam: { url: 'https://script.google.com/x', token: 't', name: 'Ana' } }) } } })
+    await unmount(component)
+    component = mount(ProjectSettings, { target: document.getElementById('target') })
+    await vi.waitFor(() => expect(document.body.textContent).toContain('never the inbox'))
+  })
 })

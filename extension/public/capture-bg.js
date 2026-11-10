@@ -182,12 +182,20 @@
         meta = r?.result || {};
       } catch { /* restricted page */ }
 
+      // The saved thing is the open page, so its text goes along (page-text.js; empty on restricted pages).
+      let text = '';
+      try {
+        await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['capture/page-text.js'] });
+        const [r] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: () => pipelinePageText() });
+        text = r?.result || '';
+      } catch { /* restricted page */ }
+
       const pdfUrl = getPdfUrl(info, tab);
       const url = pdfUrl || (info.srcUrl && isImageUrl(info.srcUrl) ? info.srcUrl : tab.url || '');
       const image = !pdfUrl && isImageUrl(url);
       capture = makeCapture(pdfUrl ? 'pdf' : image ? 'image' : 'page', {
         title: image ? filenameOf(url) : (tab.title || ''),
-        url, domain: hostOf(url), ...meta
+        url, domain: hostOf(url), ...meta, ...(!pdfUrl && !image && { text })
       });
       if (pdfUrl) {
         return promptForPdfTitleAndSave({

@@ -12,9 +12,14 @@
   import TeamSettings from './components/TeamSettings.svelte'
   import Logs from './views/Logs.svelte'
   import Timeline from './views/Timeline.svelte'
+  import Library from './views/Library.svelte'
+  import Explore from './views/Explore.svelte'
+  import Archive from './views/Archive.svelte'
+  import TeamSearches from './components/TeamSearches.svelte'
+  import { getTeam } from './backend/team.js'
   import {
     currentView, currentProjectId, currentProject,
-    projects, stats, isLoading, ontology, notification, filters, clearFilters,
+    projects, stats, isLoading, teamState, ontology, notification, filters, clearFilters,
   } from './stores/app.js'
 
   // Keep shared filters visible and reversible even when their originating
@@ -41,16 +46,20 @@
   async function boot() {
     isLoading.set(true)
     // Load projects and ontology in parallel
-    const [projectsResult, ontologyResult] = await Promise.all([
+    const [projectsResult, ontologyResult, team] = await Promise.all([
       api.listProjects(),
       api.getOntology(),
+      getTeam(),
     ])
+    teamState.set(team)
     isLoading.set(false)
     if (projectsResult.ok) {
       projects.set(projectsResult.data)
       if (projectsResult.data.length > 0 && !$currentProjectId) {
         currentProjectId.set(projectsResult.data[0].project_id)
       }
+      // Canary-only users (projects, no team) land in their inbox; everyone else starts at the Library or the welcome screen.
+      if (!team && projectsResult.data.length > 0) currentView.set('inbox')
     }
     if (ontologyResult.ok) {
       ontology.set(ontologyResult.data)
@@ -98,23 +107,38 @@
     {#if $isLoading}
       <div class="app-loading">
         <div class="spinner">◈</div>
-        <p>Loading Canary…</p>
+        <p>Loading Pipeline…</p>
       </div>
     {:else if $currentView === 'new-project'}
       <NewProject />
     {:else if $currentView === 'team'}
       <TeamSettings />
+    {:else if $currentView === 'archive'}
+      <Archive />
+    {:else if $currentView === 'team-searches'}
+      <TeamSearches />
+    {:else if !$teamState && ['library', 'explore'].includes($currentView)}
+      <div class="no-project">
+        <div class="welcome-icon">◈</div>
+        <h2>Welcome to Pipeline</h2>
+        <p>
+          Save anything — a post, a video, a page — and it goes to your team's sheet, then gets
+          archived automatically, mined for entities and made explorable. Canary monitoring is
+          optional, and its inboxes stay private to this browser.
+        </p>
+        <div class="join"><TeamSettings /></div>
+        <button class="btn-link" on:click={() => currentView.set('new-project')}>Use Canary monitoring only</button>
+      </div>
+    {:else if $currentView === 'library'}
+      <Library />
+    {:else if $currentView === 'explore'}
+      <Explore />
     {:else if !$currentProjectId}
       <div class="no-project">
         <div class="welcome-icon">◈</div>
-        <h2>Welcome to Canary</h2>
-        <p>
-          A monitoring and triage dashboard for tracking
-          events and news across any topic or region.
-        </p>
-        <button class="btn-start" on:click={() => currentView.set('new-project')}>
-          + Create your first project
-        </button>
+        <h2>Canary monitoring</h2>
+        <p>A monitoring and triage dashboard for tracking events and news across any topic or region.</p>
+        <button class="btn-start" on:click={() => currentView.set('new-project')}>+ Create your first project</button>
       </div>
     {:else if $currentView === 'inbox'}
       <Inbox status="inbox" />
@@ -320,6 +344,8 @@
     padding: 0.65rem 1.5rem;
   }
   .btn-start:hover { background: var(--accent-strong); }
+  .join { max-width: 440px; text-align: left; width: 100%; }
+  .btn-link { background: none; border: none; color: var(--accent); cursor: pointer; font-size: 0.85rem; text-decoration: underline; }
 
   /* Toast notifications */
   .toast {

@@ -338,6 +338,8 @@ function addTweetSaveButtons() {
         author:         data.authorName,
         publishDate:    data.tweetDate,
         canonicalUrl:   data.tweetUrl,
+        // Timeline tweets are not the open page; only a tweet's own page carries text.
+        text:           data.tweetId && location.pathname.includes(`/status/${data.tweetId}`) ? pipelinePageText() : '',
       });
       saveWithButton(btn, capture, `Saved tweet${data.authorUsername ? ` by ${data.authorUsername}` : ''} to team queue`);
     });
@@ -442,6 +444,7 @@ function addYouTubeSaveButton() {
       author:           data.channelName,
       publishDate:      data.uploadDate,
       canonicalUrl:     data.videoUrl,
+      text:             pipelinePageText(),
     });
     saveWithButton(btn, capture, `Saved to team queue: "${data.title.slice(0, 60)}"`);
   });
@@ -582,6 +585,7 @@ function addFacebookSaveButton() {
       fbPostText:      data.postText,
       fbPostDate:      data.postDate,
       fbReactionCount: data.reactionCount,
+      text:            isFacebookPostPage() ? pipelinePageText() : '',
     });
     saveWithButton(btn, capture, `Saved post${data.authorName ? ` by ${data.authorName}` : ''} to team queue`);
   });

@@ -33,7 +33,15 @@ describe('application bootstrap', () => {
   it('mounts and renders the first-run screen', async () => {
     app = mount(App, { target: document.getElementById('app') })
     await vi.waitFor(() => {
-      expect(document.body.textContent).toContain('Welcome to Canary')
+      expect(document.body.textContent).toContain('Welcome to Pipeline')
+    })
+  })
+
+  it('offers the join form and a Canary-only path on first run', async () => {
+    app = mount(App, { target: document.getElementById('app') })
+    await vi.waitFor(() => {
+      expect(document.querySelector('input[aria-label="Join code"]')).toBeTruthy()
+      expect(document.body.textContent).toContain('Use Canary monitoring only')
     })
   })
 
@@ -56,7 +64,7 @@ describe('application bootstrap', () => {
     app = mount(About, { target: document.getElementById('app') })
 
     expect(document.body.textContent).toContain(
-      'Canary was vibecoded with care by Guillen Torres, Investigations Lab,'
+      'Pipeline, with its Canary monitoring section, was vibecoded with care by Guillen Torres, Investigations Lab,'
     )
     expect(document.querySelector('a[href="mailto:info@osinv.org"]')?.textContent)
       .toBe('info@osinv.org')

@@ -60,3 +60,17 @@ assert rows[0]["datetime_utc"] == "2026-01-02" and rows[0]["project_id"] == "P"
 assert rows[1]["l"] == "b2" and rows[1]["saved_at"] == "2026-02-01" and rows[1]["tags"] == ""
 assert pending_ids({"c1", "b2", "zz"}, {"b2"}, {"c1": "b1", "b2": "b2"}) == [("c1", "b1")]  # zz has no bridge id
 print("bridge ok")
+
+import tempfile
+from pathlib import Path
+from bridge import cache_texts
+from run import explorer_url
+with tempfile.TemporaryDirectory() as d:
+    d = Path(d) / "texts"
+    d.mkdir()
+    (d / "c2.snippet.txt").write_text("old")
+    assert cache_texts([("c1", "Body"), ("c2", "new"), ("c3", "")], d) == 1
+    assert (d / "c1.article.txt").read_text() == "Body" and not (d / "c2.article.txt").exists() and not (d / "c3.article.txt").exists()
+    assert cache_texts([("c1", "again")], d) == 0 and (d / "c1.article.txt").read_text() == "Body"  # cached: untouched
+assert explorer_url("ana/team-news") == "https://ana.github.io/team-news/" and explorer_url("") == ""
+print("texts ok")

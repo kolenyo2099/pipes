@@ -16,14 +16,14 @@
   <div class="about-backdrop" on:click={close}></div>
 
   <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
-  <div class="about-modal" role="dialog" aria-modal="true" aria-label="About Canary" tabindex="-1" on:click|stopPropagation>
+  <div class="about-modal" role="dialog" aria-modal="true" aria-label="About Pipeline" tabindex="-1" on:click|stopPropagation>
     <button class="about-close" on:click={close} aria-label="Close">✕</button>
 
     <div class="about-icon">◈</div>
-    <h2 class="about-title">About Canary</h2>
+    <h2 class="about-title">About Pipeline</h2>
 
     <p class="about-body">
-      Canary was vibecoded with care by Guillen Torres, Investigations Lab,
+      Pipeline, with its Canary monitoring section, was vibecoded with care by Guillen Torres, Investigations Lab,
       Human Rights Center, Berkeley School of Law. For questions, suggestions,
       complaints and threats, you can reach him at:
     </p>
