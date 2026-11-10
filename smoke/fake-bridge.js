@@ -16,11 +16,13 @@ const PAGES = {
   '/_hidden-reveal': '<!doctype html><title>Late reveal</title><style>body{margin:0}main{padding:30px;background:#246;color:#fff;opacity:0}main.on{opacity:1}</style>' + strips + '<main>' + long(20) + '</main>' + strips + '<script>setTimeout(()=>document.querySelector("main").classList.add("on"),1500)</script>',
   // One-screen document whose main panel scrolls inside it.
   '/_appshell': '<!doctype html><title>App shell</title><style>html,body{margin:0;height:100%;overflow:hidden}.shell{display:flex;height:100vh}.side{width:200px;background:#ccd}.main{flex:1;overflow-y:auto}</style><div class="shell"><div class="side">Mail</div><div class="main">' + Array.from({ length: 60 }, (_, i) => `<p style="height:50px;margin:0;border-bottom:1px solid #ccc">Message ${i + 1} in the long inner panel</p>`).join('') + '</div></div>',
+  // A story whose video plays in another origin's player frame (localhost vs 127.0.0.1).
+  '/_embed': '<!doctype html><title>Embed story</title><main><h1>Embed story</h1>' + long(8) + '<iframe width="400" height="300" src="http://localhost:' + (Number(process.argv[2]) || 8787) + '/_video?frame=player.embed"></iframe></main>',
   '/_video': '<!doctype html><title>Video page</title><main><h1>Video page</h1>' + long(8) + '<img src="/_img.png" width="400" height="300"><video src="/_video.webm" controls preload="auto" width="320" height="240"><track kind="captions" src="/_cap.vtt" srclang="en"></video></main>',
 };
 let failing = false;
 
-http.createServer((req, res) => {
+const handler = (req, res) => {
   let body = '';
   req.on('data', (chunk) => { body += chunk; });
   req.on('end', () => {
@@ -41,4 +43,8 @@ http.createServer((req, res) => {
       : b.context.doGet({ parameter: Object.fromEntries(url.searchParams) });
     res.end(out.text);
   });
-}).listen(Number(process.argv[2]) || 8787, '127.0.0.1');
+};
+const port = Number(process.argv[2]) || 8787;
+http.createServer(handler).listen(port, '127.0.0.1');
+// `localhost` may resolve to ::1; the embedded-player page uses it as a second origin.
+http.createServer(handler).listen(port, '::1').on('error', () => {});

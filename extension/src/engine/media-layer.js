@@ -9,7 +9,7 @@ import { dashExtension, parseMpd, trackItems } from './media/dash.js'
 import { downloadItems, fetchText } from './media/net.js'
 import * as sites from './media/sites.js'
 import {
-  drainRecordingInPage, instagramInfoInPage, pauseInPage, pollPlaybackInPage,
+  drainRecordingInPage, requestedVideoInPage, instagramInfoInPage, pauseInPage, pollPlaybackInPage,
   recordingSummaryInPage, startPlaybackInPage, stopRecordingInPage
 } from './media/page.js'
 import { bestQualityImageUrl, isRelevantImageUrl, isStreamingUrl, VIDEO_INDICATOR_EXPRESSION, MEDIA_SOURCE_EXPRESSION } from './media/page-media.js'
@@ -38,9 +38,24 @@ export const DEFAULT_MEDIA_CONFIG = { media: true, record_playback: true, record
 export const playsMedia = ({ url, sources = [], indicator = false, hint = false }) => sources.length > 0 || Boolean(indicator) || Boolean(hint) || expectsMediaDownload(url)
 
 export const hasPlayerHint = (dom) => PLAYER_HINT.test(dom || '')
-// ponytail: a player inside a cross-origin iframe (YouTube/Vimeo embeds, newsroom players) is a separate frame the
-// debugger session does not attach to; saving it would need Target.setAutoAttach plus a recording per frame.
+// A player inside a cross-origin iframe (YouTube/Vimeo embeds, newsroom players) is a separate frame this debugger
+// session does not see. evidence.js opens each embed as its own page (embedUrls) and runs this layer on it.
 const EMBED = /<iframe[^>]+src="[^"]*(youtube|youtu\.be|vimeo|dailymotion|jwplatform|brightcove|embeds\.|player\.)/i
+
+/** The embedded players of a page as addresses that can be opened on their own. Pure. */
+export function embedUrls(dom, baseUrl) {
+  const urls = new Set()
+  for (const [tag] of String(dom || '').matchAll(/<iframe[^>]+>/gi)) {
+    if (!EMBED.test(tag)) continue
+    try {
+      const url = new URL(/src="([^"]+)"/i.exec(tag)[1].replace(/&amp;/g, '&'), baseUrl)
+      // The watch page is the player the recorder is tested against; the bare embed often refuses to play.
+      const youtube = /(^|\.)youtube(-nocookie)?\.com$/.test(url.hostname) && /^\/embed\/([\w-]{6,})/.exec(url.pathname)
+      urls.add(youtube ? `https://www.youtube.com/watch?v=${youtube[1]}` : url.href)
+    } catch { /* not an address */ }
+  }
+  return [...urls]
+}
 
 /** Fetch what the rendered page pointed at, with the live session. */
 export async function downloadSources(sources, { limit = MAX_MEDIA_FILES } = {}) {
@@ -246,6 +261,26 @@ const AD_WAIT = `(() => {
 })()`
 
 /** Play the main video to the end and keep what the player appended. */
+// The player may have gone on to other videos (YouTube autoplay, ads) in the same buffers. Keep the runs that are
+// as long as the requested video. Null when a length is known and nothing matches; everything when none is known.
+async function ownRuns(targets, length, log) {
+  if (!Number.isFinite(length) || !targets.length) return targets
+  const measured = await Promise.all(targets.map(async (target) => ({ target, duration: (await probeMedia(target.file).catch(() => null))?.duration })))
+  const own = measured.filter((m) => m.duration != null && Math.abs(m.duration - length) <= 2).map((m) => m.target)
+  if (own.length < targets.length) log({ level: 'info', message: `Kept ${own.length} of ${targets.length} recorded runs (the others are ${measured.filter((m) => !own.includes(m.target)).map((m) => `${m.duration}s`).join(', ')}, not the ${length}s video)` })
+  // Nothing measurable (a codec this browser cannot decode): keep what was recorded rather than lose it.
+  return own.length ? own : measured.every((m) => m.duration == null) ? targets : null
+}
+
+function addRecorded(files, targets, url, truncated) {
+  for (const target of targets) {
+    const mime = baseMime(target.mseMimeType)
+    files.add(mime.startsWith('audio/') ? 'audio' : 'video', mime.startsWith('audio/') ? 'recorded-audio' : 'recorded-video', target.file, mime, {
+      capture_method: 'mse-recording', source_urls: [url], mse_mime_type: target.mseMimeType, truncated
+    })
+  }
+}
+
 async function recordPlayback(url, tab, config, files, log, scriptsRan, temporary) {
   const hooked = () => tab.evaluate('Boolean(window.__hrcMse)').catch(() => false)
   await tab.send('Emulation.setScriptExecutionDisabled', { value: false })
@@ -264,6 +299,18 @@ async function recordPlayback(url, tab, config, files, log, scriptsRan, temporar
     if (waited === 0) log({ level: 'info', message: 'Waiting for a pre-roll ad to finish' })
     await sleep(1000)
   }
+  const youtubeId = /(?:[?&]v=|youtu\.be\/|\/shorts\/|\/embed\/)([\w-]{6,})/.exec(url)?.[1]
+  const requested = youtubeId ? await tab.call(requestedVideoInPage, youtubeId).catch(() => null) : null
+  if (requested?.moved) {
+    // Autoplay moved on while the page was captured, or an ad is showing. What was recorded so far cannot be
+    // trusted to be complete (its header states the full length either way): load the requested video again.
+    log({ level: 'info', message: 'The player is on another video (autoplay or an ad); loading the requested one again' })
+    await tab.navigate(url, 30_000).catch(() => {})
+    for (let waited = 0; waited < 15_000 && !(await tab.evaluate("Boolean(document.querySelector('video'))").catch(() => false)); waited += 500) await sleep(500)
+    for (let waited = 0; waited < 120_000 && (await tab.evaluate(AD_WAIT).catch(() => false)); waited += 1000) await sleep(1000)
+    // Ads the selector above does not know still show up as a different video id: wait them out.
+    for (let waited = 0; waited < 90_000 && (await tab.call(requestedVideoInPage, youtubeId).catch(() => null))?.moved; waited += 1000) await sleep(1000)
+  }
   const started = await tab.call(startPlaybackInPage, config.record_rate)
   if (!started) return false
   log({ level: 'info', message: `Recording playback at ${config.record_rate}x${started.quality ? ` (quality ${started.quality})` : ''}` })
@@ -272,12 +319,13 @@ async function recordPlayback(url, tab, config, files, log, scriptsRan, temporar
   const deadline = Date.now() + config.max_record_minutes * 60_000
   let lastTime = -1
   let reached = 0 // how far the player had fetched, which runs ahead of playback
-  let length = started.duration
+  let length = started.duration ?? requested?.length ?? null // NaN arrives as null over DevTools
   let stalledSince = Date.now()
   while (Date.now() < deadline) {
     await sleep(2000)
     const state = await tab.call(pollPlaybackInPage).catch(() => null)
     if (!state) break
+    log({ level: 'debug', message: `playback ${JSON.stringify(state)}` })
     try {
       await sink.drain(tab)
     } catch (error) {
@@ -287,9 +335,10 @@ async function recordPlayback(url, tab, config, files, log, scriptsRan, temporar
     }
     // Finished: ended, reached the length it started with, or the player moved on (time jumped back, or a different
     // video loaded — YouTube autoplays). A player the site tears down reports NaN; keep the last real length.
-    if (!Number.isFinite(started.duration) && Number.isFinite(state.duration)) length = state.duration
-    const movedOn = state.time + 1 < lastTime || (Number.isFinite(started.duration) && Math.abs(state.duration - started.duration) > 1)
+    if (!Number.isFinite(length) && Number.isFinite(state.duration)) length = state.duration
+    const movedOn = state.time + 1 < lastTime || (Number.isFinite(length) && Math.abs(state.duration - length) > 1)
     if (!movedOn) reached = Math.max(reached, state.time, state.buffered)
+    if (state.ended && Number.isFinite(length)) reached = Math.max(reached, length) // it played to its end
     if (state.ended || state.time >= length - 0.5 || movedOn) {
       await tab.call(pauseInPage).catch(() => {})
       break
@@ -307,12 +356,9 @@ async function recordPlayback(url, tab, config, files, log, scriptsRan, temporar
   if (!saveError) await sink.drain(tab).catch((error) => (saveError = error))
   await tab.call(stopRecordingInPage).catch(() => {})
   temporary.push(...sink.names)
-  for (const target of await sink.finish()) {
-    const mime = baseMime(target.mseMimeType)
-    files.add(mime.startsWith('audio/') ? 'audio' : 'video', mime.startsWith('audio/') ? 'recorded-audio' : 'recorded-video', target.file, mime, {
-      capture_method: 'mse-recording', source_urls: [url], mse_mime_type: target.mseMimeType, truncated: Boolean(sink.summary?.truncated || saveError)
-    })
-  }
+  const targets = await sink.finish()
+  // Nothing as long as the video: keep what there is, the length check below sends it to review as partial.
+  addRecorded(files, (await ownRuns(targets, length, log)) || targets, url, Boolean(sink.summary?.truncated || saveError))
   if (saveError) throw new Error(`the recording could not be saved completely: ${saveError.message}`)
   // Anything short of the full length is evidence of a failure, not a capture.
   if (!files.hasAV) throw new Error('playback recording saved no audio/video')
@@ -465,7 +511,8 @@ export async function imageFiles(sources, { limit = MAX_IMAGE_FILES } = {}) {
       const blob = await response.blob()
       const size = await createImageBitmap(blob).then((b) => { const s = { width: b.width, height: b.height }; b.close(); return s }).catch(() => ({}))
       // Banners, buttons and tracking pixels the page layout happens to size up are not the item's images.
-      if (size.width && (size.width < 200 || size.height < 150 || size.width / size.height > 8)) continue
+      // ponytail: anything under 400px on both sides is treated as a thumbnail (related-video tiles, avatars).
+      if (size.width && ((size.width < 400 && size.height < 400) || size.width / size.height > 8)) continue
       const n = files.length + 1
       files.push(media(`page_image_${n}`, `media_image_${n}${extensionForMime(type, '.jpg')}`, blob, type, { capture_method: 'direct', source_urls: [url], ...size }))
     } catch (error) {

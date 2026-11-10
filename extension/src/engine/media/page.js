@@ -45,6 +45,15 @@ export function largestVideoInPage() {
 // is not whatever the adaptive logic picked for a small tab. Nothing recorded
 // so far is dropped: the player may already have buffered the whole clip and
 // will not append it again, and a quality switch starts a separate file anyway.
+// A short YouTube video can finish while the page evidence is being captured, and the player then autoplays
+// something else. Reports whether that happened and how long the requested video is (from the page's own data,
+// which describes the video the address asked for), so its recording can be told apart from the others.
+export function requestedVideoInPage(wanted) {
+  const details = window.ytInitialPlayerResponse?.videoDetails;
+  const current = document.getElementById('movie_player')?.getVideoData?.().video_id;
+  return { moved: Boolean(wanted && current && current !== wanted), length: details?.videoId === wanted ? Number(details.lengthSeconds) || null : null };
+}
+
 export function startPlaybackInPage(rate) {
   const videos = [...document.querySelectorAll('video')];
   if (!videos.length) return null;
@@ -52,7 +61,10 @@ export function startPlaybackInPage(rate) {
   let quality = null;
   const player = document.getElementById('movie_player');
   if (player?.getAvailableQualityLevels) {
-    quality = player.getAvailableQualityLevels().find((q) => q !== 'auto') ?? null;
+    // The best quality up to 1080p: recording plays at many times normal speed, and above 1080p the browser cannot
+    // decode fast enough to keep the player fetching, so the recording stalls and comes out partial.
+    const levels = player.getAvailableQualityLevels().filter((q) => q !== 'auto');
+    quality = levels.find((q) => !/^(highres|hd2880|hd2160|hd1440)$/.test(q)) ?? levels[0] ?? null;
     if (quality) player.setPlaybackQualityRange(quality, quality);
   }
   // Chrome pauses unmuted playback without a user gesture, and YouTube
@@ -65,6 +77,9 @@ export function startPlaybackInPage(rate) {
   if (video.currentTime > 0) video.currentTime = 0;
   video.playbackRate = rate;
   video.play().catch(() => {});
+  // At 16x a short clip ends between two polls, and YouTube then autoplays the next video into the same
+  // buffers. Pause the instant the requested video ends; runs of other videos are dropped afterwards by length.
+  video.addEventListener('ended', () => { window.__hrcEnded = true; video.pause(); }, { once: true });
   window.__hrcVideo = video;
   window.__hrcRate = rate;
   return { quality, duration: video.duration, usesMse: video.src.startsWith('blob:') };
@@ -75,13 +90,13 @@ export function pollPlaybackInPage() {
   if (!video) return null;
   // Players reset the rate or pause on their own (buffering, "are you still
   // watching"); keep pushing until the end.
-  if (!video.ended) {
+  if (!video.ended && !window.__hrcEnded) {
     if (!video.muted) video.muted = true;
     if (video.playbackRate !== window.__hrcRate) video.playbackRate = window.__hrcRate;
     if (video.paused) video.play().catch(() => {});
   }
   const buffered = video.buffered.length ? video.buffered.end(video.buffered.length - 1) : 0;
-  return { time: video.currentTime, buffered, duration: video.duration, ended: video.ended, bytes: window.__hrcMse?.totalBytes() ?? 0 };
+  return { paused: video.paused, rate: video.playbackRate, ready: video.readyState, time: video.currentTime, buffered, duration: video.duration, ended: video.ended || Boolean(window.__hrcEnded), bytes: window.__hrcMse?.totalBytes() ?? 0 };
 }
 
 export function pauseInPage() {

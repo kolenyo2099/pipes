@@ -1,5 +1,5 @@
 // Parity run: capture live pages and media with the built extension and compare with what the HRC desktop app archived.
-//   node parity.mjs <archive-root> --out <report-dir> [--pages 25] [--media-per-platform 3] [--only pages|media]
+//   node parity.mjs <archive-root> --out <report-dir> [--pages 25] [--media-per-platform 3] [--only pages|media] [--url a,b]
 // <archive-root> is read-only (desktop's collections folder). Nothing from it is copied anywhere except the reports
 // written to --out; this file holds no URLs or data. Needs ffprobe on PATH for the media section.
 // Requests are polite: one page at a time, each URL once per run.
@@ -168,6 +168,13 @@ const all = listItems()
 log(`desktop items read: ${all.length}`)
 if (args.includes('--dry')) { // selection only, no browser
   log(`pages: ${pickPages(all).length} hosts; media: ${JSON.stringify(Object.entries(pickMedia(all).reduce((c, m) => (c[m.platform] = (c[m.platform] || 0) + 1, c), {})))}`)
+  process.exit(0)
+}
+
+if (flag('url')) { // ad-hoc: capture the given addresses and print what media was saved (no desktop comparison)
+  const urls = flag('url').split(',')
+  const live = await captureAll(urls)
+  for (const u of urls) log(pad(hostOf(u), 24), pad(live[u]?.status, 13), JSON.stringify(live[u]?.meta.media || []), (live[u]?.meta.capture_issues || []).map(i => i.message).join(' | '))
   process.exit(0)
 }
 

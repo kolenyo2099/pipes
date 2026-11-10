@@ -205,6 +205,13 @@ try {
     check('  its image and caption file are saved too, and the manifest data names how the video was obtained', names.some(f => /^media_image_1\.png$/.test(f.name)) && names.some(f => /^subtitles-1\.vtt$/.test(f.name)) && (meta.media || []).some(m => m.method === 'direct' && m.duration > 0 && m.width === 160), JSON.stringify(meta.media))
   }
 
+  if (haveVideo) {
+    const story = await captureLocal('_embed')
+    const names = story ? JSON.parse(story['Evidence Files'] || '[]') : []
+    const meta = story ? JSON.parse(story['Result Metadata'] || '{}') : {}
+    check('(c) video in another site\'s embedded player is saved', names.some(f => /\.webm$/.test(f.name)) && story.Status === 'done', story && `${story.Status} ${names.map(f => f.name).join(', ')} ${JSON.stringify(meta.capture_issues)}`)
+  }
+
   // (d) Manual capture of an already-open tab through the Archive view's own buttons.
   const wall = BRIDGE + '_walled'
   await sw.evaluate(u => pipelineEnqueue({ kind: 'capture', capture: { url: u, title: 'walled-item', sourceType: 'page' } }), wall)

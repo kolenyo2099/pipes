@@ -71,3 +71,15 @@ describe('what the Archive view shows per item', () => {
     expect(isRelevantImageUrl('https://e.com/logo.svg')).toBe(false)
   })
 })
+
+describe('embedded players', () => {
+  it('lists player frames as openable addresses and sends YouTube embeds to the watch page', async () => {
+    const { embedUrls } = await import('./media-layer.js')
+    const dom = `<iframe src="https://www.youtube-nocookie.com/embed/abc123XYZ_-?rel=0"></iframe>
+      <iframe width="560" src="//player.vimeo.com/video/42?h=1&amp;dnt=1"></iframe>
+      <iframe src="/ads/frame.html"></iframe><iframe src="https://www.youtube.com/embed/abc123XYZ_-"></iframe>`
+    expect(embedUrls(dom, 'https://news.example/story')).toEqual([
+      'https://www.youtube.com/watch?v=abc123XYZ_-', 'https://player.vimeo.com/video/42?h=1&dnt=1'])
+    expect(embedUrls('', 'https://news.example/')).toEqual([])
+  })
+})
