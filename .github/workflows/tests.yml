@@ -1,0 +1,38 @@
+name: tests
+on:
+  push: { branches: [main] }
+  pull_request:
+
+concurrency: { group: "tests-${{ github.ref }}", cancel-in-progress: true }
+permissions: { contents: read }
+# The Playwright smoke test (needs a real extension-capable Chromium) is run locally: node smoke/run.mjs
+
+jobs:
+  extension:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: extension } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: extension/package-lock.json }
+      - run: npm ci
+      - run: npm test
+      - run: npm run check
+      - run: npm run build
+
+  bridge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: node --test test/bridge.test.js
+
+  research:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: research } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: python3 test_pipeline.py

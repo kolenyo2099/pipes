@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte'
   import { bridge } from '../backend/bridge.js'
+  import { trustedExplorerUrl } from './explorerUrl.js'
 
   let status = null
   let error = ''
@@ -12,6 +13,7 @@
   })
 
   // Values arrive from the sheet as strings.
+  $: trusted = trustedExplorerUrl(status?.explorer_url)
   $: failed = status && (status.ok === false || String(status.ok).toLowerCase() === 'false')
   $: ago = (() => {
     const t = Date.parse(status?.finished_at)
@@ -30,6 +32,12 @@
     <div class="note">
       <h2>Explore</h2>
       <p>The first automatic run has not finished yet, so there is no explorer to show. It starts after the first saves reach the team sheet, and needs the GitHub secrets set up (ask the team admin: Pipeline → Connect GitHub in the sheet).</p>
+    </div>
+  {:else if !trusted}
+    <div class="note">
+      <h2>Explore</h2>
+      <p>The team sheet names an explorer address that Pipeline does not trust, so it is not shown. Only https addresses on github.io are used.</p>
+      <p><code>{status.explorer_url}</code></p>
     </div>
   {:else}
     <header>

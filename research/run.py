@@ -79,6 +79,7 @@ def main():
         st["articles_total"] = sum(1 for _ in csv.DictReader(p.open(encoding="utf-8"))) if p.exists() else 0
     st["finished_at"] = now()
     if not DRY:
+        Path("out").mkdir(exist_ok=True)  # a tick that fails before the pull has not created it yet
         Path("out/run_status.json").write_text(json.dumps(st, indent=2))
     try:
         stage("uv", "run", "bridge.py", "status", "--file", "out/run_status.json")

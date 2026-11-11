@@ -46,6 +46,7 @@ Same action set, same rules. JSON POST. No token sent today.
 11. lock skips already-locked rows; unlock with empty ids unlocks all held by `locked_by`.
 12. Archive sheet: columns A–N exactly HRC_HEADERS; mismatch error text "does not use the HRC column layout".
 13. Parse raw `e.postData.contents`; never key on Content-Type.
-14. HRC clients send no token today.
+14. Every request needs the TOKEN (no open mode; no TOKEN set = all requests refused, canary gets text `Unauthorized: ... Team setup`). HRC clients must send `token`.
 15. canary payload has no action: must not fall into the legacy 7-column path; must answer text.
-16. push.py payload has no action: `{tab, rows, reset, token}`.
+16. push.py payload has no action: `{tab, rows, reset, token}`. Only tabs `articles`, `mentions`, `results_articles`, `results_relations`, `pipeline_status`, `answers_*` and (append only) `Queries` are accepted.
+17. `addQueries {headers, rows}` → `{ok, added}`: appends rows whose `Entry ID` is new to `Queries`.

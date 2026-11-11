@@ -50,14 +50,26 @@ describe('outbox', () => {
     expect((await send({ type: 'pipeline:status' })).pending).toBe(0)
   })
 
-  it('appends queries to the Queries tab, with headers only when the tab is new', async () => {
-    const query = n => ({ kind: 'query', key: 'q' + n, headers: ['Query'], row: ['q' + n] })
+  const query = n => ({ kind: 'query', key: 'q' + n, headers: ['Entry ID'], row: ['q' + n] })
+
+  it('sends queries through addQueries', async () => {
+    fetch = vi.fn(async () => reply(JSON.stringify({ ok: true, added: 2 })))
+    const send = load()
+    await Promise.all([send({ type: 'pipeline:save', item: query(1) }), send({ type: 'pipeline:save', item: query(2) })])
+    await settle()
+    expect(fetch).toHaveBeenCalledTimes(1)
+    expect(JSON.parse(fetch.mock.calls[0][1].body)).toMatchObject({ token: 'tok', action: 'addQueries', headers: ['Entry ID'], rows: [['q1'], ['q2']] })
+    expect(await send({ type: 'pipeline:status' })).toMatchObject({ pending: 0, parked: 0 })
+  })
+
+  it('falls back to the tab push on a bridge without addQueries, with headers only when the tab is new', async () => {
     let sheets = ['Archive']
-    fetch = vi.fn(async (_url, init) => reply(JSON.stringify(JSON.parse(init.body).action === 'getSheets' ? { ok: true, sheets } : { ok: true })))
+    const answer = { addQueries: { ok: false, error: 'Unknown action: addQueries' }, getSheets: { ok: true, get sheets() { return sheets } } }
+    fetch = vi.fn(async (_url, init) => reply(JSON.stringify(answer[JSON.parse(init.body).action] || { ok: true })))
     const send = load()
     await send({ type: 'pipeline:save', item: query(1) })
     await settle()
-    expect(JSON.parse(fetch.mock.calls[1][1].body)).toMatchObject({ token: 'tok', tab: 'Queries', rows: [['Query'], ['q1']] })
+    expect(JSON.parse(fetch.mock.calls[2][1].body)).toMatchObject({ token: 'tok', tab: 'Queries', rows: [['Entry ID'], ['q1']] })
     sheets = ['Archive', 'Queries']
     await send({ type: 'pipeline:save', item: query(2) })
     await settle()

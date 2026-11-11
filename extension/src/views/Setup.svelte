@@ -59,6 +59,10 @@
       <p>Paste the new script over the old one, save, then <b>Deploy → Manage deployments → pencil → Version: New version → Deploy</b>. The URL and the join code stay the same. A <i>new</i> deployment would change the URL and everyone would have to join again.</p>
     </details>
     <details>
+      <summary>Someone left, or the join code leaked</summary>
+      <p><b>Pipeline → Rotate join code</b> in the sheet. The old code stops working at once; send the new one to the team (everyone joins again under the same project name) and, if you use GitHub, replace the <code>PIPELINE_TEAM_CODE</code> secret.</p>
+    </details>
+    <details>
       <summary>What appears in the sheet</summary>
       <ul>
         <li><code>Archive</code>: one row per saved item, with who saved it, its archive status and evidence hashes.</li>

@@ -11,7 +11,7 @@ One Google Apps Script bridge per team sheet. It replaces the HRC Archiver / Sav
 5. Copy the Web app URL the deploy dialog shows (also under Deploy → Manage deployments; it ends in `/exec`).
 6. Run **Pipeline → Show join code** and paste that URL. The dialog shows the join code, which is `base64url({url, token})`. Share it with the team.
 
-With no `TOKEN` the bridge is open (v5 behaviour) so older clients keep working; `health` and the no-action GET report `auth: "open"` so clients can warn. With a `TOKEN`, every request needs it: `token` in the POST body or the GET query. Research push refuses to run without a `TOKEN`.
+There is no open mode: without a `TOKEN` every request (including `health` and the no-action GET) is refused with an error telling the owner to run **Pipeline → Team setup**. With a `TOKEN`, every request needs it: `token` in the POST body or the GET query. **Pipeline → Rotate join code** (after a confirm) replaces the `TOKEN`: everyone must re-join with the new code and the GitHub secret `PIPELINE_TEAM_CODE` must be updated.
 
 Other script properties: `ID_PREFIX` (default `ITEM`), `ID_SEQ` and `SEARCH_SEQ` (counters, managed by the bridge).
 
@@ -22,7 +22,8 @@ Other script properties: `ID_PREFIX` (default `ITEM`), `ID_SEQ` and `SEARCH_SEQ`
 - `Archive`: columns A–N are the HRC layout. Extended columns follow (Saved By … Extra) and are added automatically.
 - `Searches`: shared Canary search definitions. `Config`: Key / Value, edited by humans.
 - `Texts`: page text sent by the extension (`ID`, `Text 1`, `Text 2`, `Saved At`; 90,000 chars max). Reserved.
-- Any other tab is a plain Save to Sheets worksheet or a push target.
+- `Queries`: Query Forge entries (`Entry ID` column), appended by `addQueries` without duplicates.
+- Any other tab is a plain Save to Sheets worksheet. `putTab` only writes the research tabs (see Actions).
 
 ## Actions
 
@@ -32,10 +33,11 @@ POST JSON (raw body, any content type):
 - HRC: `add`, `updateStatus`, `updateMany` (accepts `fields` and evidence shorthands), `lock`, `unlock`, `clearStaleLocks`, `list`, `health`.
 - Canary: no action, `{headers[], values[]}`. Replies with text `OK`, `Unauthorized` or `ERROR: ...`.
 - Page text and status: `putText`, `getTexts` (max 50 ids), `getStatus` (the `pipeline_status` tab as an object); `list` items carry `has_text`.
-- Push: `putTab` or no action with `{tab, rows, reset}`. Reserved tabs are refused.
+- Push: `putTab` or no action with `{tab, rows, reset}`, only for `articles`, `mentions`, `results_articles`, `results_relations`, `pipeline_status`, `answers_*` (reset + append) and `Queries` (append only, `reset` is refused). Other tabs are refused.
+- Queries: `addQueries` `{headers[], rows[][]}` creates `Queries` with the header row if needed and appends rows whose `Entry ID` is not there yet; replies `{ok, added}`. An older bridge answers `Unknown action`.
 - Shared: `listSearches`, `upsertSearch`, `getConfig`.
 
-GET: no params (sheets, headers, `bridge_version`, `auth`), `?action=list`, `?action=health`.
+GET: no params (sheets, headers, `bridge_version`, `auth: "token"`), `?action=list`, `?action=health`.
 
 Items get server ids like `ITEM-2026-00001`. Extension and canary writes dedupe by URL (the saver is merged into Saved By); HRC `add` dedupes by id only.
 

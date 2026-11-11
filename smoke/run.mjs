@@ -246,7 +246,7 @@ try {
     check('  the tab was not reloaded, is scriptable again, and its text reached the sheet', (await userTab.evaluate(() => window.__marker)) === 42 && !!text)
   }
   await app.getByRole('button', { name: /Explore/ }).first().click()
-  check('Explore embeds the explorer', !!(await until(async () => (await app.locator(`iframe[src="${article}"]`).count()) > 0, 8000)), (await app.locator('main').innerText()).slice(0, 120).replace(/\s+/g, ' '))
+  check('Explore refuses an explorer address that is not on github.io', !!(await until(async () => (await app.getByText(/does not trust/).count()) > 0, 8000)) && (await app.locator('main iframe').count()) === 0, (await app.locator('main').innerText()).slice(0, 120).replace(/\s+/g, ' '))
   await shot('explore')
   await app.getByRole('button', { name: /Team searches/ }).first().click()
   await app.waitForTimeout(800)

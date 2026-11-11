@@ -1,7 +1,15 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 
-const { load, Sheet, HRC, EXT } = require('./fake-apps-script');
+const { load: rawLoad, Sheet, HRC, EXT } = require('./fake-apps-script');
+
+// The bridge refuses everything without a TOKEN: tests get one and send it unless they bring their own.
+const load = (opts = {}) => {
+  if (opts.props && 'TOKEN' in opts.props) return rawLoad(opts);
+  const b = rawLoad({ ...opts, props: { TOKEN: 'tk', ...opts.props } });
+  for (const k of ['get', 'post', 'postText']) { const f = b[k]; b[k] = (body) => f({ token: 'tk', ...body }); }
+  return b;
+};
 
 const archiveWith = (...rows) => [new Sheet('Archive', [HRC, ...rows])];
 const item = (id, url, extra = {}) => ({ action: 'add', id, url, ...extra });
@@ -18,12 +26,17 @@ test('token is required on POST and GET when TOKEN is set (trimmed compare)', ()
   assert.equal(b.post({ action: 'health', token: 'secret' }).auth, 'token');
 });
 
-test('without TOKEN the bridge is open and says so', () => {
-  const b = load();
-  assert.equal(b.get({}).auth, 'open');
-  assert.equal(b.get({}).bridge_version, 7);
-  assert.equal(b.get({ action: 'health' }).auth, 'open');
-  assert.equal(b.post({ action: 'getSheets' }).ok, true);
+test('without TOKEN every request is refused and points at Team setup', () => {
+  const b = rawLoad();
+  for (const r of [b.get({}), b.get({ action: 'health' }), b.post({ action: 'getSheets' }), b.post({ action: 'getSheets', token: '' }),
+    b.post({ tab: 'articles', rows: [['x']] })]) {
+    assert.equal(r.ok, false);
+    assert.match(r.error, /Team setup/);
+  }
+  assert.match(b.postText({ headers: ['url'], values: ['https://x.test/c'] }), /^Unauthorized.*Team setup/);
+  assert.equal(b.spreadsheet.getSheets()[0].rows.length, 0);
+  assert.equal(load().get({}).bridge_version, 8);
+  assert.equal(load().get({ action: 'health' }).auth, 'token');
 });
 
 test('HRC add: same id + same url is unchanged, same id + different url is ok:false', () => {
@@ -152,25 +165,43 @@ test('canary payload becomes one Archive row and replies with text', () => {
   assert.equal(b.spreadsheet.getSheets()[0].rows.length, 0); // never the legacy 7-column path
 });
 
-test('push legacy payload resets, appends, guards formulas; refuses reserved tabs and open bridges', () => {
-  const b = load({ props: { TOKEN: 'tk' } });
+test('push legacy payload resets, appends, guards formulas; refuses tabs off the allow-list', () => {
+  const b = load();
   const rows = [['id', 'text'], ['1', '=HYPERLINK("x")'], ['2']];
-  assert.deepEqual(b.post({ token: 'tk', tab: 'Canary', rows, reset: true }), { ok: true, rows: 3 });
-  assert.deepEqual(b.spreadsheet.getSheetByName('Canary').rows, [['id', 'text'], ['1', "'=HYPERLINK(\"x\")"], ['2', '']]);
-  b.post({ token: 'tk', tab: 'Canary', rows: [['3', 'c']], reset: false });
-  assert.equal(b.spreadsheet.getSheetByName('Canary').rows.length, 4);
-  b.post({ action: 'putTab', token: 'tk', tab: 'Canary', rows: [['only', 'row']], reset: true });
-  assert.deepEqual(b.spreadsheet.getSheetByName('Canary').rows, [['only', 'row']]);
-  for (const tab of ['Archive', 'searches', 'CONFIG']) {
-    assert.equal(b.post({ token: 'tk', tab, rows: [['x']], reset: true }).ok, false);
+  assert.deepEqual(b.post({ token: 'tk', tab: 'articles', rows, reset: true }), { ok: true, rows: 3 });
+  assert.deepEqual(b.spreadsheet.getSheetByName('articles').rows, [['id', 'text'], ['1', "'=HYPERLINK(\"x\")"], ['2', '']]);
+  b.post({ token: 'tk', tab: 'articles', rows: [['3', 'c']], reset: false });
+  assert.equal(b.spreadsheet.getSheetByName('articles').rows.length, 4);
+  b.post({ action: 'putTab', token: 'tk', tab: 'articles', rows: [['only', 'row']], reset: true });
+  assert.deepEqual(b.spreadsheet.getSheetByName('articles').rows, [['only', 'row']]);
+  for (const tab of ['Archive', 'searches', 'CONFIG', 'texts', 'Canary', 'answer', 'Sheet1']) {
+    const r = b.post({ token: 'tk', tab, rows: [['x']], reset: true });
+    assert.equal(r.ok, false, tab);
+    assert.match(r.error, /cannot be pushed to/);
   }
-  assert.equal(b.post({ token: 'wrong', tab: 'Canary', rows }).ok, false);
+  for (const tab of ['mentions', 'results_articles', 'results_relations', 'pipeline_status', 'answers_q1', 'ANSWERS_x']) {
+    assert.equal(b.post({ token: 'tk', tab, rows: [['x']], reset: true }).ok, true, tab);
+  }
+  assert.equal(b.post({ token: 'wrong', tab: 'articles', rows }).ok, false);
+});
 
-  const open = load();
-  const refused = open.post({ tab: 'Canary', rows, reset: true });
-  assert.equal(refused.ok, false);
-  assert.match(refused.error, /Team setup/);
-  assert.equal(open.spreadsheet.getSheetByName('Canary'), null);
+test('Queries accepts putTab appends but never a reset', () => {
+  const b = load();
+  assert.equal(b.post({ tab: 'Queries', rows: [['Entry ID'], ['1']] }).ok, true);
+  const r = b.post({ tab: 'Queries', rows: [['Entry ID']], reset: true });
+  assert.equal(r.ok, false);
+  assert.match(r.error, /append-only/);
+  assert.equal(b.spreadsheet.getSheetByName('Queries').rows.length, 2);
+});
+
+test('addQueries creates the header once, appends, skips known Entry IDs, guards formulas', () => {
+  const b = load();
+  const headers = ['Query', 'Entry ID'];
+  assert.deepEqual(b.post({ action: 'addQueries', headers, rows: [['q1', 'e1'], ['=x', 'e2'], ['dup', 'e1']] }), { ok: true, added: 2 });
+  assert.deepEqual(b.post({ action: 'addQueries', headers, rows: [['q1', 'e1'], ['q3', 'e3']] }), { ok: true, added: 1 });
+  assert.deepEqual(b.spreadsheet.getSheetByName('Queries').rows, [headers, ['q1', 'e1'], ["'=x", 'e2'], ['q3', 'e3']]);
+  assert.equal(b.post({ action: 'addQueries', headers: ['Query'], rows: [['q']] }).ok, false);
+  assert.equal(rawLoad().post({ action: 'addQueries', headers, rows: [] }).ok, false);
 });
 
 test('formula guard applies to every write path', () => {
@@ -258,7 +289,7 @@ test('list and health shapes include extended fields', () => {
   assert.equal(viaPost.total, 1);
   for (const health of [b.get({ token: 't', action: 'health' }), b.post({ token: 't', action: 'health' })]) {
     assert.equal(health.schema_version, 4);
-    assert.equal(health.bridge_version, 7);
+    assert.equal(health.bridge_version, 8);
     assert.equal(health.item_count, 1);
     assert.equal(health.sheet_name, 'Archive');
     assert.equal(health.spreadsheet_name, 'Team sheet');
@@ -320,7 +351,7 @@ test('a wrong A-N layout throws the HRC layout error and is left untouched', () 
 });
 
 test('Team setup creates TOKEN once; the join code uses the pasted web app URL', () => {
-  const b = load();
+  const b = rawLoad();
   const exec = 'https://script.google.com/macros/s/AKfy123/exec';
   b.prompts.push({ button: 'OK', text: ` ${exec} ` });
   b.context.teamSetup();
@@ -337,18 +368,41 @@ test('Team setup creates TOKEN once; the join code uses the pasted web app URL',
   assert.match(b.alerts.at(-1)[1], new RegExp(code));
 
   // Not an /exec address (for example the /dev test address): refused, nothing stored.
-  const wrong = load();
+  const wrong = rawLoad();
   wrong.prompts.push({ button: 'OK', text: 'https://script.google.com/macros/s/AKfy123/dev' });
   wrong.context.teamSetup();
   assert.match(wrong.alerts.at(-1).join(' '), /not a web app URL/);
   assert.equal(wrong.properties.WEBAPP_URL, undefined);
 
-  const cancelled = load();
+  const cancelled = rawLoad();
   cancelled.context.teamSetup();
   assert.equal(cancelled.alerts.length, 0);
-  const fresh = load();
+  const fresh = rawLoad();
   fresh.context.showJoinCode();
   assert.equal(fresh.properties.TOKEN, undefined);
+});
+
+test('Rotate join code: confirm first, new token, join code from the stored URL', () => {
+  const exec = 'https://script.google.com/macros/s/AKfy123/exec';
+  const b = rawLoad({ props: { TOKEN: 'old', WEBAPP_URL: exec } });
+  const ui = b.context.SpreadsheetApp.getUi();
+  let answer = 'CANCEL';
+  const alert = ui.alert;
+  b.context.SpreadsheetApp.getUi = () => ({ ...ui, alert: (...a) => { alert(...a); return answer; } });
+  b.context.rotateJoinCode();
+  assert.equal(b.properties.TOKEN, 'old');
+  assert.match(b.alerts[0][1], /PIPELINE_TEAM_CODE/);
+  answer = 'OK';
+  b.prompts.push({ button: 'OK', text: '' });
+  b.context.rotateJoinCode();
+  assert.match(b.properties.TOKEN, /^[0-9a-f]{20,}$/);
+  const code = b.alerts.at(-1)[1].trim().split('\n').pop();
+  assert.deepEqual(JSON.parse(Buffer.from(code, 'base64url').toString()), { url: exec, token: b.properties.TOKEN });
+  const bare = rawLoad({ props: { TOKEN: 'old' } });
+  bare.context.SpreadsheetApp.getUi = () => ({ ...ui, alert: (...a) => { bare.alerts.push(a); return 'OK'; } });
+  bare.context.rotateJoinCode();
+  assert.notEqual(bare.properties.TOKEN, 'old');
+  assert.match(bare.alerts.at(-1)[1], /Show join code/);
 });
 
 test('onOpen keeps header seeding', () => {
@@ -458,9 +512,8 @@ test('Connect GitHub stores repo and token; blank token keeps the stored one', (
   assert.equal(b.properties.GITHUB_TOKEN, 'new');
 });
 
-test('Texts is reserved for putTab', () => {
-  const b = load({ props: { TOKEN: 't' } });
-  const r = b.post({ action: 'putTab', token: 't', tab: 'texts', rows: [['a']] });
+test('Texts cannot be pushed to', () => {
+  const r = load().post({ action: 'putTab', tab: 'texts', rows: [['a']] });
   assert.equal(r.ok, false);
-  assert.match(r.error, /reserved/);
+  assert.match(r.error, /cannot be pushed to/);
 });

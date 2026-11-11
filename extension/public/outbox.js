@@ -62,16 +62,22 @@ async function post(team, batch) {
     return text === 'OK' ? [{ ok: true }] : fail(text.slice(0, 300))
   }
   if (batch[0].kind === 'query') {
-    // Queries tab: appended through the bridge's generic tab push, so an already deployed bridge needs no update.
-    // ponytail: the header row is written by whoever finds the tab missing; two first-ever saves at once would write it twice.
+    // Queries tab: the bridge's addQueries adds only entries it does not have yet. An older bridge answers
+    // "Unknown action": then fall back to the generic tab push, which needs no bridge update.
+    // ponytail: the fallback writes the header row when it finds the tab missing; two first-ever saves at once would write it twice.
     const json = async body => {
       const response = await request(body)
       if (!response.ok) fail(`HTTP ${response.status}`)
       const reply = await response.json()
       return reply.ok === false ? fail(reply.error || 'Bad reply from the bridge') : reply
     }
-    const exists = ((await json({ action: 'getSheets' })).sheets || []).includes('Queries')
-    await json({ tab: 'Queries', rows: [...(exists ? [] : [batch[0].headers]), ...batch.map(i => i.row)] })
+    try {
+      await json({ action: 'addQueries', headers: batch[0].headers, rows: batch.map(i => i.row) })
+    } catch (error) {
+      if (!/^unknown action/i.test(error.message || '')) throw error
+      const exists = ((await json({ action: 'getSheets' })).sheets || []).includes('Queries')
+      await json({ tab: 'Queries', rows: [...(exists ? [] : [batch[0].headers]), ...batch.map(i => i.row)] })
+    }
     return batch.map(() => ({ ok: true }))
   }
   const response = await request({ action: 'dataBatch', sheetName: 'Archive', items: batch.map(i => ({ capture: i.capture })) })

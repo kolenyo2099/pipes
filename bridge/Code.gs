@@ -9,11 +9,11 @@
  *   Deploy → New deployment → Web app, Execute as: Me | Who has access: Anyone.
  * Run Team setup again after deploying to get the join code.
  *
- * Script properties: TOKEN (auth; unset = open), WEBAPP_URL (pasted at setup), ID_PREFIX, ID_SEQ, SEARCH_SEQ,
+ * Script properties: TOKEN (auth; no TOKEN = every request refused until Team setup), WEBAPP_URL (pasted at setup), ID_PREFIX, ID_SEQ, SEARCH_SEQ,
  * GITHUB_REPO / GITHUB_TOKEN (menu Connect GitHub), LAST_DISPATCH.
  */
 
-const BRIDGE_VERSION = 7;
+const BRIDGE_VERSION = 8;
 const SCHEMA_VERSION = 4;
 const HRC_SHEET_NAME = "Archive";
 const HRC_HEADERS = [
@@ -44,7 +44,9 @@ const DISPATCH_GAP_MS = 5 * 60 * 1000;
 const SEARCH_HEADERS = [
   "ID", "Project", "Lane", "Name", "Query", "Interval Mins", "Owner", "Enabled", "Updated At"
 ];
-const RESERVED_TABS = [HRC_SHEET_NAME, SEARCHES_TAB, CONFIG_TAB, TEXTS_TAB].map((name) => name.toLowerCase());
+// Tabs the research pipeline pushes (research/push.py, research/bridge.py); Queries is append-only.
+const PUSH_TABS = ["articles", "mentions", "results_articles", "results_relations", "pipeline_status"];
+const QUERIES_TAB = "Queries";
 const CANARY_MAPPED = [
   "canary_item_id", "url", "title_or_summary", "snippet_or_context", "notes", "tags",
   "saved_by", "saved_at", "query_bucket", "project_id", "source_type", "doc_language",
@@ -54,7 +56,7 @@ const CANARY_MAPPED = [
 function doGet(e) {
   try {
     const params = e && e.parameter ? e.parameter : {};
-    if (!authorized(params.token)) return jsonResponse(UNAUTHORIZED);
+    if (!authorized(params.token)) return jsonResponse(denied());
     const action = params.action || "";
 
     if (!action) return describeExtensionSheet(params);
@@ -85,7 +87,7 @@ function doPost(e) {
     ? textResponse("ERROR: " + message)
     : jsonResponse({ ok: false, status: "error", error: message });
 
-  if (!authorized(body.token)) return canary ? textResponse("Unauthorized") : jsonResponse(UNAUTHORIZED);
+  if (!authorized(body.token)) return canary ? textResponse(getToken() ? "Unauthorized" : NOT_SET_UP.error) : jsonResponse(denied());
   if (action === "getSheets") return extensionGetSheets();
   if (action === "getHeaders") return extensionGetHeaders(body);
 
@@ -102,6 +104,7 @@ function doPost(e) {
     list: listItems,
     health: healthCheck,
     putTab: putTab,
+    addQueries: addQueries,
     listSearches: listSearches,
     upsertSearch: upsertSearch,
     getConfig: getConfig,
@@ -132,6 +135,8 @@ function doPost(e) {
 // ── Auth ────────────────────────────────────────────────────────────────────
 
 const UNAUTHORIZED = { ok: false, error: "Unauthorized: missing or wrong token" };
+const NOT_SET_UP = { ok: false, error: "Unauthorized: this bridge has no token yet. The owner must run the sheet menu Pipeline → Team setup" };
+const denied = () => getToken() ? UNAUTHORIZED : NOT_SET_UP;
 
 function getToken() {
   return (PropertiesService.getScriptProperties().getProperty("TOKEN") || "").trim();
@@ -139,10 +144,8 @@ function getToken() {
 
 function authorized(sent) {
   const token = getToken();
-  return !token || String(sent == null ? "" : sent).trim() === token;
+  return !!token && String(sent == null ? "" : sent).trim() === token;
 }
-
-const authMode = () => getToken() ? "token" : "open";
 
 // ── Chrome extension compatibility ──────────────────────────────────────────
 
@@ -158,7 +161,7 @@ function describeExtensionSheet(params) {
     ok: true,
     status: "ok",
     bridge_version: BRIDGE_VERSION,
-    auth: authMode(),
+    auth: "token",
     sheets,
     headers,
     hrc_sheet_name: HRC_SHEET_NAME
@@ -171,7 +174,7 @@ function extensionGetSheets() {
     ok: true,
     status: "ok",
     bridge_version: BRIDGE_VERSION,
-    auth: authMode(),
+    auth: "token",
     sheets: names,
     hrc_sheet_name: HRC_SHEET_NAME
   });
@@ -394,12 +397,12 @@ function canaryAdd(body) {
 function putTab(body) {
   const tab = String(body.tab || "").trim();
   if (!tab || !Array.isArray(body.rows)) return jsonResponse({ ok: false, error: "tab and rows are required" });
-  if (RESERVED_TABS.indexOf(tab.toLowerCase()) !== -1) {
-    return jsonResponse({ ok: false, error: 'Tab "' + tab + '" is reserved' });
+  const name = tab.toLowerCase();
+  const queries = name === QUERIES_TAB.toLowerCase();
+  if (!(PUSH_TABS.indexOf(name) !== -1 || /^answers_/.test(name) || queries)) {
+    return jsonResponse({ ok: false, error: 'Tab "' + tab + '" cannot be pushed to' });
   }
-  if (!getToken()) {
-    return jsonResponse({ ok: false, error: "Push overwrites data and needs a TOKEN: run Pipeline → Team setup first" });
-  }
+  if (queries && body.reset) return jsonResponse({ ok: false, error: "Queries is append-only: reset is refused" });
 
   const spreadsheet = getSpreadsheet();
   const sheet = spreadsheet.getSheetByName(tab) || spreadsheet.insertSheet(tab);
@@ -414,6 +417,32 @@ function putTab(body) {
     sheet.getRange(start, 1, values.length, width).setValues(values);
   }
   return jsonResponse({ ok: true, rows: rows.length });
+}
+
+// Query Forge: append rows whose Entry ID is not in the tab yet.
+function addQueries(body) {
+  const headers = body.headers, rows = body.rows;
+  if (!Array.isArray(headers) || !Array.isArray(rows)) return jsonResponse({ ok: false, error: "headers and rows are required" });
+  const idCol = headers.indexOf("Entry ID");
+  if (idCol < 0) return jsonResponse({ ok: false, error: 'headers need an "Entry ID" column' });
+  const sheet = ensureTab(QUERIES_TAB, headers);
+  const known = {};
+  if (sheet.getLastRow() > 1) {
+    sheet.getRange(2, idCol + 1, sheet.getLastRow() - 1, 1).getValues().forEach((r) => { known[String(r[0])] = true; });
+  }
+  const values = [];
+  rows.forEach((row) => {
+    const id = String(row[idCol] == null ? "" : row[idCol]);
+    if (known[id]) return;
+    known[id] = true;
+    values.push(headers.map((_, i) => row[i] == null ? "" : safe(row[i])));
+  });
+  if (values.length) {
+    const start = sheet.getLastRow() + 1;
+    sheet.getRange(start, 1, values.length, 1).setNumberFormat("@");
+    sheet.getRange(start, 1, values.length, headers.length).setValues(values);
+  }
+  return jsonResponse({ ok: true, added: values.length });
 }
 
 // ── Archive writes (ids, dedupe) ────────────────────────────────────────────
@@ -619,7 +648,7 @@ function healthCheck() {
     ok: true,
     schema_version: SCHEMA_VERSION,
     bridge_version: BRIDGE_VERSION,
-    auth: authMode(),
+    auth: "token",
     extension_compatible: true,
     item_count: Math.max(0, sheet.getLastRow() - 1)
   }, spreadsheetIdentity()));
@@ -948,6 +977,7 @@ function onOpen() {
   SpreadsheetApp.getUi().createMenu("Pipeline")
     .addItem("Team setup", "teamSetup")
     .addItem("Show join code", "showJoinCode")
+    .addItem("Rotate join code", "rotateJoinCode")
     .addItem("Connect GitHub", "connectGithub")
     .addToUi();
 
@@ -962,11 +992,21 @@ function onOpen() {
 }
 
 function teamSetup() {
-  const props = PropertiesService.getScriptProperties();
-  if (!getToken()) {
-    props.setProperty("TOKEN", Utilities.getUuid().replace(/-/g, "") + Utilities.getUuid().replace(/-/g, ""));
-  }
+  if (!getToken()) newToken();
   showJoinCode();
+}
+
+const newToken = () => PropertiesService.getScriptProperties().setProperty(
+  "TOKEN", Utilities.getUuid().replace(/-/g, "") + Utilities.getUuid().replace(/-/g, ""));
+
+function rotateJoinCode() {
+  const ui = SpreadsheetApp.getUi();
+  if (ui.alert("Rotate join code",
+    "The old join code stops working at once. Everyone must re-join with the new code, and the GitHub secret PIPELINE_TEAM_CODE must be updated. Continue?",
+    ui.ButtonSet.OK_CANCEL) !== ui.Button.OK) return;
+  newToken();
+  if (PropertiesService.getScriptProperties().getProperty("WEBAPP_URL")) return showJoinCode();
+  ui.alert("New join code ready", "Run Pipeline → Show join code to get it.", ui.ButtonSet.OK);
 }
 
 // The join code carries the web app address. Apps Script cannot be trusted to report it (ScriptApp.getService()
