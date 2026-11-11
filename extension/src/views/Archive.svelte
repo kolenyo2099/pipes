@@ -97,7 +97,7 @@
   </div>
 {/snippet}
 
-<div class="archive">
+<div class="page archive">
   <h1>Archive{team?.label ? `: ${team.label}` : ''}</h1>
   {#if loading && !team}
     <p class="hint">Loading…</p>
@@ -173,21 +173,11 @@
 </div>
 
 <style>
-  .archive { padding: 1.5rem 2rem; max-width: 900px }
-  h1 { font-size: 1.2rem; margin: 0 0 0.75rem }
-  h2 { font-size: 0.95rem; margin: 1.25rem 0 0.5rem }
-  button { background: var(--bg-card); border: 1px solid var(--border); border-radius: 5px; color: var(--text); cursor: pointer; font: inherit; font-size: 0.8rem; padding: 0.3rem 0.7rem }
-  button:disabled { cursor: default; opacity: 0.6 }
-  .card { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 12px; margin: 8px 0; border: 1px solid var(--border, #ddd); border-radius: 8px }
   .actions { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; max-width: 330px; text-align: right; flex-shrink: 0 }
-  .primary { font-weight: 600 }
-  .link { background: none; border: 0; padding: 0; text-decoration: underline; color: var(--text-muted, #666); font-size: 12px; text-align: right }
+  .link { text-align: right }
   .how { margin: 0.25rem 0 0.75rem; padding-left: 1.1rem }
   .how li { margin: 0.2rem 0 }
   .now { font-weight: 600; font-size: 13px }
   details .bar { flex-direction: column; align-items: flex-start; gap: 6px }
   .bar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin: 12px 0 }
-  .hint { color: var(--text-muted, #666); font-size: 13px; overflow-wrap: anywhere }
-  .warn { background: #fffbeb; border: 1px solid #f4d58d; border-radius: 8px; padding: 8px 12px }
-  .err { color: var(--danger, #b00020) }
 </style>

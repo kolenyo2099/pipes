@@ -59,9 +59,9 @@
   const day = value => String(value || '').slice(0, 10)
 </script>
 
-<section class="library">
+<section class="page library">
   <header>
-    <h2>Library</h2>
+    <h1>Library</h1>
     <button on:click={load} disabled={loading}>{loading ? 'Loading…' : 'Refresh'}</button>
   </header>
 
@@ -119,17 +119,13 @@
 </section>
 
 <style>
-  .library { padding: 1.5rem 2rem; }
   header { align-items: center; display: flex; gap: 1rem; justify-content: space-between; }
-  h2 { font-size: 1.2rem; margin: 0; }
-  button { background: var(--bg-card); border: 1px solid var(--border); border-radius: 5px; color: var(--text); cursor: pointer; font: inherit; font-size: 0.8rem; padding: 0.3rem 0.7rem; }
-  button:disabled { cursor: default; opacity: 0.6; }
+  h1 { margin: 0; }
   .notice { background: var(--accent-soft); border: 1px solid var(--accent-light); border-radius: 6px; color: var(--accent-strong); font-size: 0.8rem; margin: 0.75rem 0 0; padding: 0.5rem 0.75rem; }
   .notice--error { background: var(--signal-soft); border-color: var(--signal); color: var(--signal); }
   .summary { color: var(--text-muted); font: 500 0.78rem var(--mono); margin: 0.75rem 0 0.5rem; }
   .empty { color: var(--text-muted); font-size: 0.9rem; margin: 2rem 0; max-width: 32rem; }
   .controls { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem; }
-  .controls input, .controls select { background: var(--bg-card); border: 1px solid var(--border); border-radius: 5px; color: var(--text); font-size: 0.8rem; padding: 0.35rem 0.5rem; }
   .controls input { flex: 1 1 16rem; }
   ul { list-style: none; margin: 0; padding: 0; }
   li { align-items: center; border-bottom: 1px solid var(--border); display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; justify-content: space-between; padding: 0.55rem 0; }
@@ -141,6 +137,6 @@
   .chips { display: flex; flex-wrap: wrap; gap: 0.3rem; }
   .chip { border: 1px solid var(--border); border-radius: 999px; color: var(--text-muted); font-size: 0.7rem; padding: 0.05rem 0.5rem; white-space: nowrap; }
   .chip--on { background: var(--accent-soft); border-color: var(--accent-light); color: var(--accent-strong); }
-  .chip--warn { background: #fff3cd; border-color: var(--canary-deep); color: var(--canary-ink); }
+  .chip--warn { background: var(--amber-soft); border-color: var(--amber); color: #6b4a0f; }
   .chip--bad { background: var(--signal-soft); border-color: var(--signal); color: var(--signal); }
 </style>

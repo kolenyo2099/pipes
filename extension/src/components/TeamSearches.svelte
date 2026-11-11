@@ -27,7 +27,7 @@
   }
 </script>
 
-<div class="searches">
+<div class="page searches">
   <h1>Team searches</h1>
   {#if loading}
     <p class="hint">Loading…</p>
@@ -63,12 +63,5 @@
 </div>
 
 <style>
-  .searches { padding: 1.5rem 2rem; max-width: 800px }
-  h1 { font-size: 1.2rem; margin: 0 0 0.75rem }
-  button { background: var(--bg-card); border: 1px solid var(--border); border-radius: 5px; color: var(--text); cursor: pointer; font: inherit; font-size: 0.8rem; padding: 0.3rem 0.7rem }
-  button:disabled { cursor: default; opacity: 0.6 }
-  .card { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 12px; margin: 8px 0; border: 1px solid var(--border, #ddd); border-radius: 8px }
-  .hint { color: var(--text-muted, #666); font-size: 13px }
-  .err { color: var(--danger, #b00020) }
   .actions { display: flex; gap: 8px; align-items: center }
 </style>

@@ -2,7 +2,7 @@ import { writable, derived } from 'svelte/store'
 import { getTeam, listTeams } from '../backend/team.js'
 
 // ── Navigation ─────────────────────────────────────────────────────────────────
-// Views: 'library' (home) | 'explore' | 'archive' | 'queries' | 'team-searches' | 'team' | Canary: 'inbox' | 'saved' | 'dismissed' | 'timeline' | 'settings' | 'logs' | 'new-project'
+// Views: 'library' (home) | 'explore' | 'archive' | 'queries' | 'team-searches' | 'setup' | 'team' | Canary: 'inbox' | 'saved' | 'dismissed' | 'timeline' | 'settings' | 'logs' | 'new-project'
 export const currentView = writable('library')
 export const currentProjectId = writable(null)
 

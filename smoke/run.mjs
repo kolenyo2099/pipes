@@ -264,6 +264,9 @@ try {
   check('Queries: a saved query reaches the sheet\'s Queries tab with a header row', !!queries && queries[0][3] === 'Query' && queries[1][1] === 'Smoke Tester' && queries[1][2] === 'saved' && /smoke/.test(queries[1][3]), JSON.stringify(queries || (await sheet()).Queries).slice(0, 300))
   check('  and is kept in the local ledger under the team project', (await forge.locator('#ledgerCount').innerText()).trim() === '1')
   await shot('queries')
+  await app.getByRole('button', { name: 'Setup', exact: true }).click()
+  check('Setup guide opens from the sidebar and covers the sheet and GitHub', (await app.getByRole('button', { name: /Copy the bridge script/ }).count()) === 1 && (await app.getByText('PIPELINE_TEAM_CODE').count()) > 0)
+  await shot('setup')
 
   // A second project (its own sheet). A save made while A is active must land in A even if the user switches before delivery.
   const B = { id: 'proj-b', label: 'Project B', url: BRIDGE2, token: 'smoke-token', name: 'Smoke Tester' }

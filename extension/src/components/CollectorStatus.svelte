@@ -345,7 +345,7 @@
 <style>
   .collector-status {
     background: rgba(255, 255, 255, 0.35);
-    border: 1.5px solid rgba(42, 36, 16, 0.2);
+    border: 1.5px solid rgba(255, 255, 255, 0.25);
     border-radius: 8px;
     margin: 0.75rem 0.5rem;
     padding: 0.6rem 0.7rem;
@@ -364,7 +364,7 @@
   .header-btns { display: flex; gap: 0.3rem; }
   .btn-trigger,
   .btn-pause {
-    border: 1.5px solid var(--canary-ink);
+    border: 1.5px solid var(--sidebar-text);
     border-radius: 5px;
     cursor: pointer;
     font-size: 0.68rem;
@@ -372,11 +372,11 @@
     padding: 0.15rem 0.45rem;
     white-space: nowrap;
   }
-  .btn-trigger { background: var(--canary-ink); color: var(--canary); }
-  .btn-trigger:hover:not(:disabled) { background: var(--ink-2); }
+  .btn-trigger { background: var(--sidebar-active-bg); color: var(--sidebar-active-text); }
+  .btn-trigger:hover:not(:disabled) { background: var(--moss-soft); }
   .btn-trigger:disabled { opacity: 0.4; cursor: default; }
-  .btn-pause { background: transparent; color: var(--canary-ink); }
-  .btn-pause:hover:not(:disabled) { background: rgba(42, 36, 16, 0.1); }
+  .btn-pause { background: transparent; color: var(--sidebar-text); }
+  .btn-pause:hover:not(:disabled) { background: rgba(255, 255, 255, 0.14); }
   .btn-pause:disabled { opacity: 0.5; cursor: default; }
   .btn-resume { background: var(--moss); border-color: var(--moss); color: #fff; }
   .btn-resume:hover:not(:disabled) { background: var(--moss-deep); }

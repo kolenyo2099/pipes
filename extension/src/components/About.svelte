@@ -19,7 +19,7 @@
   <div class="about-modal" role="dialog" aria-modal="true" aria-label="About Pipeline" tabindex="-1" on:click|stopPropagation>
     <button class="about-close" on:click={close} aria-label="Close">✕</button>
 
-    <div class="about-icon">◈</div>
+    <img class="about-icon" src="/pipe.svg" alt="" />
     <h2 class="about-title">About Pipeline</h2>
 
     <p class="about-body">
@@ -40,11 +40,11 @@
   }
 
   .about-modal {
-    background: #1e293b;
-    border: 1px solid rgba(255,255,255,0.1);
+    background: var(--surface);
+    border: 1px solid var(--line);
     border-radius: 12px;
     box-shadow: 0 24px 64px rgba(0,0,0,0.45);
-    color: #e2e8f0;
+    color: var(--ink);
     left: 50%;
     max-width: 420px;
     padding: 2rem 2rem 1.75rem;
@@ -62,10 +62,10 @@
   }
 
   .about-close {
-    background: rgba(255,255,255,0.07);
+    background: var(--paper-2);
     border: none;
     border-radius: 6px;
-    color: #64748b;
+    color: var(--muted);
     cursor: pointer;
     font-size: 0.85rem;
     line-height: 1;
@@ -75,32 +75,28 @@
     top: 1rem;
     transition: background 0.12s, color 0.12s;
   }
-  .about-close:hover { background: rgba(255,255,255,0.14); color: #e2e8f0; }
+  .about-close:hover { background: var(--line); color: var(--ink); }
 
-  .about-icon {
-    color: #60a5fa;
-    font-size: 2.2rem;
-    margin-bottom: 0.5rem;
-  }
+  .about-icon { border-radius: 12px; box-shadow: 0 0 0 3px var(--pipe-ink); height: 52px; margin-bottom: 0.75rem; width: 52px; }
 
   .about-title {
-    color: #f1f5f9;
+    color: var(--ink);
     font-size: 1.05rem;
     font-weight: 700;
     margin: 0 0 1.25rem;
   }
 
   .about-body {
-    color: #94a3b8;
+    color: var(--ink-2);
     font-size: 0.83rem;
     line-height: 1.65;
     margin: 0 0 0.75rem;
   }
   .about-email {
-    background: rgba(96,165,250,0.12);
-    border: 1px solid rgba(96,165,250,0.25);
+    background: var(--accent-soft);
+    border: 1px solid var(--accent-light);
     border-radius: 6px;
-    color: #60a5fa;
+    color: var(--accent-strong);
     display: inline-block;
     font-family: monospace;
     font-size: 0.82rem;

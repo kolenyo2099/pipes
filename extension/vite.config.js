@@ -36,5 +36,5 @@ export default defineConfig({
     rollupOptions: { input: { index: 'index.html', offscreen: 'offscreen.html' } },
   },
   worker: { format: 'es' },
-  server: { host: '127.0.0.1' },
+  server: { host: '127.0.0.1', fs: { allow: ['..'] } }, // views/Setup.svelte bundles ../bridge/Code.gs
 })

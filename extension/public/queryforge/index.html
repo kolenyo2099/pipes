@@ -1107,7 +1107,7 @@
 
     /* ── Pipeline ── */
     :root {
-      --ink: #1a1d1b; --muted: #5e6862; --paper: #edefea; --card-bg: #fafbf8; --hover-bg: #e4e8e2; --chip-bg: #dfe8e1; --border: #d3d8d1;
+      --ink: #1a1d1b; --muted: #5e6862; --paper: #f4f6f2; --card-bg: #ffffff; --hover-bg: #e7ece5; --chip-bg: #e2f3e6; --border: #d5dcd3;
       --alert: #b8402a; --alert-bg: #f7e3dd;
       --display: "Archivo", system-ui, sans-serif; --serif: var(--display);
       --sans: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -1116,6 +1116,35 @@
     /* In a team project Pipeline's own switcher picks the project. */
     body.pipeline-team .project-picker, body.pipeline-team .mode-project, body.pipeline-team #ledgerManageProjects { display: none; }
     .pipeline-project { font-size: 0.82rem; color: var(--muted); align-self: center; }
+
+    /* Same furniture as Pipeline's other views (src/App.svelte .page): green primary buttons with a
+       pipe-lip bottom edge, white cards, 6px corners, the page title set like the other h1s. */
+    :root { --r: 6px; --pipe-deep: #1b7a3a; --pipe-dark: #115a2a; --pipe-ink: #0b2a14; --line-strong: #b9c0b7; }
+    header { border-bottom: 1px solid var(--border); padding: 0 2.25rem; }
+    .header-seal { display: none; }
+    .masthead { font-family: var(--display); font-size: 1.5rem; font-stretch: 110%; font-weight: 800; letter-spacing: -0.01em; }
+    .masthead span { text-decoration: none; }
+    .btn-primary, .btn-search, .op-add-btn, .domain-add-btn, .tut-btn-next {
+      background: var(--pipe-deep); border-color: var(--pipe-dark); border-bottom-width: 3px; color: #fff;
+    }
+    .btn-primary:hover, .btn-search:hover, .op-add-btn:hover, .domain-add-btn:hover, .tut-btn-next:hover { background: var(--pipe-dark); border-color: var(--pipe-ink); }
+    .btn-sweep { border-color: var(--pipe-deep); color: var(--pipe-dark); }
+    .btn-sweep:hover { background: var(--chip-bg); color: var(--pipe-dark); }
+    .op-btn.active { background: var(--pipe-deep); border-color: var(--pipe-dark); color: #fff; }
+    .step-num { background: var(--pipe-deep); border: 0; border-bottom: 3px solid var(--pipe-ink); border-radius: 6px; color: #fff; font-family: var(--display); font-weight: 800; height: 24px; min-width: 24px; }
+    .ledger-count { background: var(--pipe-deep); color: #fff; }
+    .ledger-open-btn, .btn-ghost, .btn-clear, .btn-save-ledger, .copy-btn, .ledger-tool-btn, .example-btn, .op-btn, .door, .mode-option { border-radius: 6px; }
+    .ledger-open-btn, .btn-ghost, .btn-clear, .btn-save-ledger, .ledger-tool-btn { background: #fff; border-color: var(--line-strong); font-weight: 600; }
+    .tut-header { background: var(--pipe-deep); border-bottom: 3px solid var(--pipe-ink); color: #fff; }
+    .tut-header .tut-skip { color: rgba(255, 255, 255, 0.85); }
+    #modeCard, #tutorialCard, #sweepCard, #ledgerCard, #mapCard, #projectDialog { border-radius: 10px; }
+    .door, .mode-option, .panel { background: #fff; box-shadow: 0 1px 2px rgba(11, 42, 20, 0.06), 0 2px 8px rgba(11, 42, 20, 0.05); }
+    .door:hover, .mode-option:hover { border-color: var(--pipe-deep); }
+    .door[aria-expanded="true"] { border-color: var(--pipe-deep); box-shadow: inset 3px 0 0 var(--pipe-deep); }
+    input[type=text], input[type=url], input[type=password], input[type=date], input[type=number], select { border-color: var(--line-strong); }
+    input:focus, select:focus, textarea:focus { border-color: var(--pipe-deep); }
+    #preview { border-radius: 8px 8px 0 0; }
+    a { color: var(--pipe-deep); }
   </style>
 </head>
 

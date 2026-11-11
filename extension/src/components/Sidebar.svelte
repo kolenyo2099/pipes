@@ -1,4 +1,5 @@
 <script>
+  import Icon from './Icon.svelte'
   import { api } from '../api.js'
   import CollectorStatus from './CollectorStatus.svelte'
   import {
@@ -31,7 +32,7 @@
     const result = await api.switchTeam(id)
     if (!result.ok) return notify('error', result.error)
     await syncTeams()
-    if (!['library', 'explore', 'archive', 'queries', 'team-searches'].includes($currentView)) setView('library')
+    if (!['library', 'explore', 'archive', 'queries', 'team-searches', 'setup'].includes($currentView)) setView('library')
   }
 
   let restoreInput
@@ -91,7 +92,7 @@
 <aside class="sidebar">
   <!-- Logo -->
   <div class="sidebar-logo">
-    <img src="/canary.png" alt="Pipeline" class="logo-img" />
+    <img src="/pipe.svg" alt="" class="logo-img" />
     <div class="logo-text-block">
       <span class="logo-text">Pipeline</span>
       <span class="logo-sub">Save · Archive · Explore</span>
@@ -114,11 +115,11 @@
     </div>
     {#if $teamState}
       <nav class="nav">
-        <button class="nav-item" class:active={$currentView === 'library'} data-tour="nav-library" on:click={() => setView('library')}><span class="nav-icon">📚</span>Library</button>
-        <button class="nav-item" class:active={$currentView === 'explore'} on:click={() => setView('explore')}><span class="nav-icon">🧭</span>Explore</button>
-        <button class="nav-item" class:active={$currentView === 'archive'} on:click={() => setView('archive')}><span class="nav-icon">🗄</span>Archive</button>
-        <button class="nav-item" class:active={$currentView === 'queries'} on:click={() => setView('queries')}><span class="nav-icon">⌕</span>Queries</button>
-        <button class="nav-item" class:active={$currentView === 'team-searches'} on:click={() => setView('team-searches')}><span class="nav-icon">🔎</span>Team searches</button>
+        <button class="nav-item" class:active={$currentView === 'library'} data-tour="nav-library" on:click={() => setView('library')}><span class="nav-icon"><Icon name="library" /></span>Library</button>
+        <button class="nav-item" class:active={$currentView === 'explore'} on:click={() => setView('explore')}><span class="nav-icon"><Icon name="explore" /></span>Explore</button>
+        <button class="nav-item" class:active={$currentView === 'archive'} on:click={() => setView('archive')}><span class="nav-icon"><Icon name="archive" /></span>Archive</button>
+        <button class="nav-item" class:active={$currentView === 'queries'} on:click={() => setView('queries')}><span class="nav-icon"><Icon name="queries" /></span>Queries</button>
+        <button class="nav-item" class:active={$currentView === 'team-searches'} on:click={() => setView('team-searches')}><span class="nav-icon"><Icon name="shared" /></span>Team searches</button>
       </nav>
     {/if}
   </section>
@@ -129,7 +130,7 @@
     <p class="group-caption">Private to this browser: your own Canary searches and inbox</p>
   <!-- GDELT Reference guide trigger -->
   <button class="btn-guide" on:click={() => guideOpen.set(true)} title="GDELT reference guide">
-    📖 GDELT Reference
+    <Icon name="guide" /> GDELT Reference
   </button>
 
   <div class="project-switcher" data-tour="project-area">
@@ -165,7 +166,7 @@
         data-tour="nav-inbox"
         on:click={() => setView('inbox')}
       >
-        <span class="nav-icon">📥</span>
+        <span class="nav-icon"><Icon name="inbox" /></span>
         Inbox
         {#if inboxCount > 0}
           <span class="nav-badge">{inboxCount}</span>
@@ -177,7 +178,7 @@
         data-tour="nav-timeline"
         on:click={() => setView('timeline')}
       >
-        <span class="nav-icon">📅</span>
+        <span class="nav-icon"><Icon name="timeline" /></span>
         Timeline
       </button>
       <button
@@ -185,7 +186,7 @@
         class:active={$currentView === 'saved'}
         on:click={() => setView('saved')}
       >
-        <span class="nav-icon">🔖</span>
+        <span class="nav-icon"><Icon name="saved" /></span>
         Saved
         {#if savedCount > 0}
           <span class="nav-badge nav-badge--green">{savedCount}</span>
@@ -196,7 +197,7 @@
         class:active={$currentView === 'dismissed'}
         on:click={() => setView('dismissed')}
       >
-        <span class="nav-icon">🗑</span>
+        <span class="nav-icon"><Icon name="dismissed" /></span>
         Dismissed
       </button>
       <button
@@ -204,7 +205,7 @@
         class:active={$currentView === 'logs'}
         on:click={() => setView('logs')}
       >
-        <span class="nav-icon">📋</span>
+        <span class="nav-icon"><Icon name="logs" /></span>
         Collector Logs
       </button>
       <button
@@ -213,7 +214,7 @@
         data-tour="nav-settings"
         on:click={() => setView('settings')}
       >
-        <span class="nav-icon">⚙</span>
+        <span class="nav-icon"><Icon name="settings" /></span>
         Monitor settings
       </button>
     </nav>
@@ -238,25 +239,28 @@
   <!-- Backup: data lives only in this browser profile; removing the extension deletes it -->
   <div class="section-label">Backup</div>
   <div class="quick-actions">
-    <button class="action-btn" on:click={downloadBackup}>⬇ Download backup</button>
-    <button class="action-btn" on:click={() => restoreInput.click()}>⬆ Restore backup</button>
+    <button class="action-btn" on:click={downloadBackup}><Icon name="download" /> Download backup</button>
+    <button class="action-btn" on:click={() => restoreInput.click()}><Icon name="upload" /> Restore backup</button>
     <input hidden type="file" accept="application/json,.json" bind:this={restoreInput} on:change={restoreBackup} />
   </div>
   </section>
 
-  <!-- Bottom bar: Tour + About — pinned to bottom -->
+  <!-- Bottom bar: Tour + Setup + About — pinned to bottom -->
   <div class="bottom-bar">
     <button class="btn-tour" on:click={() => tourOpen.set(true)} title="Replay tour">
-      ? Tour
+      Tour
+    </button>
+    <button class="btn-setup" class:active={$currentView === 'setup'} on:click={() => setView('setup')} title="How to set everything up">
+      Setup
     </button>
     <button class="btn-about" on:click={() => aboutOpen.set(true)} title="About Pipeline">
-      ℹ About
+      About
     </button>
   </div>
 </aside>
 
 <style>
-  /* Canary Lite sidebar: canary yellow, ink text, ink pill for the active view. */
+  /* The sidebar is the pipe: shaded green body, and the logo block is its lip. White pill for the active view. */
   .sidebar {
     background: var(--sidebar-bg);
     color: var(--sidebar-text);
@@ -274,9 +278,13 @@
     align-items: center;
     display: flex;
     gap: 0.6rem;
-    padding: 1.1rem 1rem 0.7rem;
+    padding: 1rem 1rem 0.85rem;
+    background: linear-gradient(90deg, #3bb35e 0, #2fa84f 6%, #259247 24%, #1b7a3a 75%, #136030 100%);
+    border-bottom: 3px solid var(--pipe-ink);
+    box-shadow: 0 4px 0 rgba(11, 42, 20, 0.18);
+    margin-bottom: 0.35rem;
   }
-  .logo-img { flex-shrink: 0; height: 30px; width: 30px; border-radius: 6px; object-fit: contain; }
+  .logo-img { flex-shrink: 0; height: 34px; width: 34px; border-radius: 8px; box-shadow: 0 0 0 2px var(--pipe-ink); }
   .logo-text-block { display: flex; flex-direction: column; min-width: 0; }
   .logo-text {
     font: 800 1.35rem/1 var(--display);
@@ -284,7 +292,7 @@
     letter-spacing: -0.02em;
     text-transform: uppercase;
   }
-  .logo-sub { font: 500 0.6rem/1.3 var(--mono); letter-spacing: 0.04em; margin-top: 0.2rem; opacity: 0.75; text-transform: uppercase; }
+  .logo-sub { font: 500 0.56rem/1.3 var(--mono); letter-spacing: 0; white-space: nowrap; margin-top: 0.2rem; opacity: 0.75; text-transform: uppercase; }
 
   .section-label {
     font: 500 0.66rem/1.4 var(--mono);
@@ -295,48 +303,48 @@
   }
   .project-switcher { display: flex; flex-direction: column; gap: 0.4rem; padding: 0 1rem 0.5rem; }
   .project-select {
-    background: rgba(255, 255, 255, 0.45);
-    border: 1.5px solid var(--canary-ink);
+    background: #fff;
+    border: 1.5px solid var(--pipe-ink);
     border-radius: 6px;
-    color: var(--canary-ink);
+    color: var(--ink);
     font-size: 0.82rem;
     font-weight: 600;
     padding: 0.45rem 0.5rem;
     width: 100%;
   }
-  .project-select:focus-visible { outline-color: var(--canary-ink); }
+  .project-select:focus-visible, .sidebar :global(button:focus-visible) { outline-color: #fff; }
   .btn-new-project {
     background: transparent;
-    border: 1.5px dashed rgba(42, 36, 16, 0.45);
+    border: 1.5px dashed rgba(255, 255, 255, 0.45);
     border-radius: 6px;
-    color: var(--canary-ink);
+    color: var(--sidebar-text);
     cursor: pointer;
     font-size: 0.8rem;
     font-weight: 600;
     padding: 0.4rem;
     width: 100%;
   }
-  .btn-new-project:hover { background: rgba(42, 36, 16, 0.1); }
+  .btn-new-project:hover { background: rgba(255, 255, 255, 0.14); }
   .empty-hint { font-size: 0.78rem; margin: 0; opacity: 0.75; }
 
   /* Two labelled groups: team (shared, lighter tint) and monitor (private, darker tint). */
   .group { border-radius: 8px; margin: 0.5rem 0.5rem 0; padding-bottom: 0.4rem; }
-  .group--team { background: rgba(255, 255, 255, 0.4); border: 1.5px solid var(--canary-ink); }
-  .group--monitor { background: rgba(42, 36, 16, 0.1); border: 1.5px dashed rgba(42, 36, 16, 0.45); }
+  .group--team { background: rgba(255, 255, 255, 0.12); border: 1.5px solid rgba(255, 255, 255, 0.45); }
+  .group--monitor { background: rgba(11, 42, 20, 0.22); border: 1.5px dashed rgba(255, 255, 255, 0.35); }
   .group-head { font: 800 0.8rem/1.4 var(--display); letter-spacing: 0.06em; padding: 0.5rem 0.6rem 0; text-transform: uppercase; }
   .group-caption { font-size: 0.7rem; line-height: 1.35; margin: 0; opacity: 0.8; padding: 0.1rem 0.6rem 0.2rem; }
   .group .project-switcher { padding: 0.3rem 0.5rem 0.5rem; }
   .group .nav { padding: 0 0.25rem; }
   .group .section-label { padding-inline: 0.6rem; }
   .group .quick-actions { padding-inline: 0.25rem; }
-  .btn-new-project.active { background: var(--canary-ink); border-style: solid; color: var(--canary); }
+  .btn-new-project.active { background: var(--sidebar-active-bg); border-style: solid; color: var(--sidebar-active-text); }
   .nav { display: flex; flex-direction: column; gap: 2px; padding: 0 0.5rem; }
   .nav-item {
     align-items: center;
     background: none;
     border: none;
     border-radius: 6px;
-    color: var(--canary-ink);
+    color: var(--sidebar-text);
     cursor: pointer;
     display: flex;
     font-size: 0.85rem;
@@ -346,9 +354,9 @@
     text-align: left;
     width: 100%;
   }
-  .nav-item:hover { background: rgba(42, 36, 16, 0.1); }
-  .nav-item.active { background: var(--canary-ink); color: var(--canary); }
-  .nav-icon { font-size: 0.85rem; }
+  .nav-item:hover { background: rgba(255, 255, 255, 0.14); }
+  .nav-item.active { background: var(--sidebar-active-bg); color: var(--sidebar-active-text); }
+  .nav-icon { display: inline-flex; }
   .nav-badge { font: 500 0.72rem var(--mono); margin-left: auto; opacity: 0.8; }
   .nav-item.active .nav-badge { opacity: 1; }
 
@@ -357,46 +365,55 @@
     background: none;
     border: none;
     border-radius: 6px;
-    color: var(--canary-ink);
+    color: var(--sidebar-text);
     cursor: pointer;
-    display: block;
+    align-items: center;
+    display: flex;
+    gap: 0.45rem;
     font-size: 0.8rem;
     font-weight: 500;
     padding: 0.4rem 0.6rem;
     text-align: left;
     text-decoration: none;
   }
-  .action-btn:hover { background: rgba(42, 36, 16, 0.1); }
-  .action-btn--warn { background: var(--canary-ink); color: var(--canary); }
-  .action-btn--warn:hover { background: var(--ink-2); }
+  .action-btn:hover { background: rgba(255, 255, 255, 0.14); }
+  .action-btn--warn { background: var(--sidebar-active-bg); color: var(--sidebar-active-text); }
+  .action-btn--warn:hover { background: var(--moss-soft); }
 
   .btn-guide {
     background: none;
     border: none;
-    color: var(--canary-ink);
+    color: var(--sidebar-text);
     cursor: pointer;
     font: 500 0.72rem var(--mono);
     letter-spacing: 0.02em;
+    align-items: center;
+    display: flex;
+    gap: 0.45rem;
     margin: 0 0.5rem;
     padding: 0.35rem 0.5rem;
     text-align: left;
     border-radius: 6px;
   }
-  .btn-guide:hover { background: rgba(42, 36, 16, 0.1); }
+  .btn-guide:hover { background: rgba(255, 255, 255, 0.14); }
 
-  .bottom-bar { border-top: 1.5px solid rgba(42, 36, 16, 0.2); display: flex; margin-top: auto; }
+  .bottom-bar { border-top: 1.5px solid rgba(255, 255, 255, 0.25); display: flex; margin-top: auto; }
   .btn-tour,
+  .btn-setup,
   .btn-about {
     background: none;
     border: none;
-    color: var(--canary-ink);
+    color: var(--sidebar-text);
     cursor: pointer;
     flex: 1;
     font-size: 0.75rem;
     font-weight: 600;
     padding: 0.65rem 0.5rem 0.9rem;
   }
-  .btn-tour { border-right: 1.5px solid rgba(42, 36, 16, 0.2); }
+  .btn-tour { border-right: 1.5px solid rgba(255, 255, 255, 0.25); }
+  .btn-setup { border-right: 1.5px solid rgba(255, 255, 255, 0.25); }
+  .btn-setup.active { background: var(--sidebar-active-bg); color: var(--sidebar-active-text); }
   .btn-tour:hover,
-  .btn-about:hover { background: rgba(42, 36, 16, 0.1); }
+  .btn-setup:hover:not(.active),
+  .btn-about:hover { background: rgba(255, 255, 255, 0.14); }
 </style>
