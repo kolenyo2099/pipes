@@ -9,7 +9,7 @@
  *   Deploy → New deployment → Web app, Execute as: Me | Who has access: Anyone.
  * Run Team setup again after deploying to get the join code.
  *
- * Script properties: TOKEN (auth; unset = open), ID_PREFIX, ID_SEQ, SEARCH_SEQ,
+ * Script properties: TOKEN (auth; unset = open), WEBAPP_URL (pasted at setup), ID_PREFIX, ID_SEQ, SEARCH_SEQ,
  * GITHUB_REPO / GITHUB_TOKEN (menu Connect GitHub), LAST_DISPATCH.
  */
 
@@ -969,19 +969,26 @@ function teamSetup() {
   showJoinCode();
 }
 
+// The join code carries the web app address. Apps Script cannot be trusted to report it (ScriptApp.getService()
+// .getUrl() can return an address that answers 404), so the person who deployed pastes it once and it is stored.
 function showJoinCode() {
   const ui = SpreadsheetApp.getUi();
+  const props = PropertiesService.getScriptProperties();
   const token = getToken();
   if (!token) return ui.alert("No token yet", "Run Pipeline → Team setup first.", ui.ButtonSet.OK);
-  const url = ScriptApp.getService().getUrl();
-  if (!url) {
-    return ui.alert(
-      "Deploy the web app first",
-      "The token exists, but there is no web app URL yet. Deploy → New deployment → Web app " +
-      "(Execute as: Me, Who has access: Anyone), then run Pipeline → Show join code.",
-      ui.ButtonSet.OK
-    );
+  const stored = props.getProperty("WEBAPP_URL") || "";
+  const answer = ui.prompt(
+    "Web app URL",
+    "Paste the Web app URL from Deploy → Manage deployments (it ends in /exec)." +
+    (stored ? "\n\nLeave blank to keep: " + stored : "\n\nNot deployed yet? Deploy → New deployment → Web app (Execute as: Me, Who has access: Anyone)."),
+    ui.ButtonSet.OK_CANCEL
+  );
+  if (answer.getSelectedButton() !== ui.Button.OK) return;
+  const url = answer.getResponseText().trim() || stored;
+  if (!/^https:\/\/script\.google\.com\/.+\/exec$/.test(url)) {
+    return ui.alert("That is not a web app URL", "It should look like https://script.google.com/macros/s/…/exec. Copy it from Deploy → Manage deployments.", ui.ButtonSet.OK);
   }
+  props.setProperty("WEBAPP_URL", url);
   const code = Utilities.base64EncodeWebSafe(JSON.stringify({ url, token }));
   ui.alert("Join code", "Share this with your team (the web app must stay deployed):\n\n" + code, ui.ButtonSet.OK);
 }

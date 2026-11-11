@@ -7,6 +7,7 @@ import * as store from './backend/store.js'
 import { ontology, searchThemes } from './backend/ontology.js'
 import { runProjectNow, channel, BUDGETS, budgetUsed, BROKEN_LANES } from './backend/collect.js'
 import { buildSheetRow } from './backend/sheets.js'
+import { bridge } from './backend/bridge.js'
 import { getTeam, setTeam } from './backend/team.js'
 import { validateToken, collectionSearch, configuredToken, TOKEN_SETTING } from './backend/mediacloud.js'
 import { BLUESKY_ACCOUNT, blueskySignIn } from './backend/bluesky.js'
@@ -42,14 +43,7 @@ async function reconcileSheets() {
   return store.reconcileSheetResults((await chrome.storage.local.get('pipelineResults')).pipelineResults || {})
 }
 
-async function checkTeam() {
-  const team = await getTeam()
-  if (!team) throw new HttpError(400, 'Join your team first')
-  const response = await fetch(team.url, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ token: team.token, action: 'health' }) })
-  const reply = await response.json().catch(() => ({}))
-  if (!response.ok || reply.ok === false) throw new Error(reply.error || `HTTP ${response.status}`)
-  return { item_count: reply.item_count }
-}
+const checkTeam = async () => ({ item_count: (await bridge('health')).item_count })
 
 // In the extension, collection runs in the offscreen document so it continues when this tab closes.
 async function triggerCollect(projectId) {

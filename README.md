@@ -8,7 +8,8 @@ One Google Apps Script bridge per team sheet. It replaces the HRC Archiver / Sav
 2. Replace the script with `bridge/Code.gs` and save. Reload the sheet.
 3. Menu **Pipeline → Team setup**. This creates the `TOKEN` script property.
 4. Deploy → New deployment → Web app. Execute as: **Me**, Who has access: **Anyone**.
-5. Run **Pipeline → Team setup** (or **Show join code**) again. The dialog shows the join code, which is `base64url({url, token})`. Share it with the team.
+5. Copy the Web app URL the deploy dialog shows (also under Deploy → Manage deployments; it ends in `/exec`).
+6. Run **Pipeline → Show join code** and paste that URL. The dialog shows the join code, which is `base64url({url, token})`. Share it with the team.
 
 With no `TOKEN` the bridge is open (v5 behaviour) so older clients keep working; `health` and the no-action GET report `auth: "open"` so clients can warn. With a `TOKEN`, every request needs it: `token` in the POST body or the GET query. Research push refuses to run without a `TOKEN`.
 

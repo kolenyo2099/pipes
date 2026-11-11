@@ -319,24 +319,33 @@ test('a wrong A-N layout throws the HRC layout error and is left untouched', () 
   assert.deepEqual(b.archive().rows[0], legacy);
 });
 
-test('Team setup creates TOKEN once and shows a decodable join code', () => {
+test('Team setup creates TOKEN once; the join code uses the pasted web app URL', () => {
   const b = load();
+  const exec = 'https://script.google.com/macros/s/AKfy123/exec';
+  b.prompts.push({ button: 'OK', text: ` ${exec} ` });
   b.context.teamSetup();
   const token = b.properties.TOKEN;
-  assert.match(token, /^[0-9a-f-]{20,}$/);
-  assert.equal(token.includes('-'), false);
-  const text = b.alerts.at(-1)[1];
-  const code = text.trim().split('\n').pop();
-  assert.deepEqual(JSON.parse(Buffer.from(code, 'base64url').toString()), { url: 'https://script.test/exec', token });
+  assert.match(token, /^[0-9a-f]{20,}$/);
+  const code = b.alerts.at(-1)[1].trim().split('\n').pop();
+  assert.deepEqual(JSON.parse(Buffer.from(code, 'base64url').toString()), { url: exec, token });
+  assert.equal(b.properties.WEBAPP_URL, exec);
+
+  // Blank keeps the stored address; the token is not regenerated.
+  b.prompts.push({ button: 'OK', text: '' });
   b.context.teamSetup();
   assert.equal(b.properties.TOKEN, token);
-  b.context.showJoinCode();
-  assert.equal(b.alerts.length, 3);
+  assert.match(b.alerts.at(-1)[1], new RegExp(code));
 
-  const undeployed = load({ url: null });
-  undeployed.context.teamSetup();
-  assert.ok(undeployed.properties.TOKEN);
-  assert.match(undeployed.alerts[0].join(' '), /Deploy/);
+  // Not an /exec address (for example the /dev test address): refused, nothing stored.
+  const wrong = load();
+  wrong.prompts.push({ button: 'OK', text: 'https://script.google.com/macros/s/AKfy123/dev' });
+  wrong.context.teamSetup();
+  assert.match(wrong.alerts.at(-1).join(' '), /not a web app URL/);
+  assert.equal(wrong.properties.WEBAPP_URL, undefined);
+
+  const cancelled = load();
+  cancelled.context.teamSetup();
+  assert.equal(cancelled.alerts.length, 0);
   const fresh = load();
   fresh.context.showJoinCode();
   assert.equal(fresh.properties.TOKEN, undefined);

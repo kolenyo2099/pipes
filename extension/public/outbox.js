@@ -49,7 +49,7 @@ async function pipelineEnqueue(item) {
 
 // Returns one result per batch item, or throws {message, fatal} when the whole request failed (fatal = wrong token).
 async function post(team, batch) {
-  const request = body => fetch(team.url, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ token: team.token, ...body }) })
+  const request = body => fetch(team.url, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ token: team.token, ...body }), credentials: 'omit' })
   const fail = (message, fatal) => { throw { message, fatal: fatal || /^unauthorized/i.test(message) } }
   if (batch[0].kind === 'canary') {
     const response = await request({ headers: batch[0].headers, values: batch[0].values })
