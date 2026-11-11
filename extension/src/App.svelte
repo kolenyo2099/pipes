@@ -16,6 +16,7 @@
   import Explore from './views/Explore.svelte'
   import Archive from './views/Archive.svelte'
   import TeamSearches from './components/TeamSearches.svelte'
+  import Queries from './views/Queries.svelte'
   import {
     currentView, currentProjectId, currentProject,
     projects, stats, isLoading, teamState, syncTeams, ontology, notification, filters, clearFilters,
@@ -120,6 +121,8 @@
       <TeamSettings />
     {:else if $currentView === 'archive'}
       {#key $teamState?.id}<Archive />{/key}
+    {:else if $currentView === 'queries'}
+      {#key $teamState?.id}<Queries />{/key}
     {:else if $currentView === 'team-searches'}
       {#key $teamState?.id}<TeamSearches />{/key}
     {:else if !$teamState && ['library', 'explore'].includes($currentView)}

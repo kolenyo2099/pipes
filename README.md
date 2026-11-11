@@ -55,6 +55,7 @@ No dependencies. Runs `test/bridge.test.js` against a fake SpreadsheetApp in `no
 - **Save**: buttons on Google, X, YouTube and Facebook, right-click save for pages, links, PDFs and images. Page text is sent with the save. One outbox delivers everything and retries.
 - **Archive**: HRC Archiver's capture engine. Screenshot, PDF, MHTML, HAR, DOM, SHA-256 hashes and an RFC 3161 timestamp go to `Downloads/Pipeline/<project>/` or a folder you pick in the Archive view (a recorded video is one MP4 with its audio); formerly `Downloads/Pipeline/<id>/` on the capturing machine; the sheet gets the hashes. Rows are locked while a teammate captures them.
 - **Explore**: the entity explorer published by the research pipeline, with the time of the last run.
+- **Queries (Query Forge)**: build Google queries (operators, source lists by country, date sweeps). Every saved or run query is kept in a local hash-chained ledger and appended to the sheet's `Queries` tab.
 - **Monitor (Canary)**: optional news and social monitoring. Inboxes stay in each browser; a monitoring setup can be shared with the team under Team searches.
 
 ```

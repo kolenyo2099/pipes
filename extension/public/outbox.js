@@ -29,7 +29,8 @@ function badge(queue) {
 async function pipelineEnqueue(item) {
   const team = await getTeam()
   if (!configured(team)) return { ok: false, error: 'Team not configured: open Pipeline → Team sheet and paste the join code' }
-  if (item?.kind === 'capture' ? !item.capture?.url : item?.kind !== 'canary' || !item.ref || !item.headers || !item.values) return { ok: false, error: 'Invalid item' }
+  const valid = { capture: i => i.capture?.url, canary: i => i.ref && i.headers && i.values, query: i => Array.isArray(i.headers) && Array.isArray(i.row) }[item?.kind]
+  if (!valid?.(item)) return { ok: false, error: 'Invalid item' }
   const sent = (await store(SENT)) || {}
   const queued = await mutate(queue => {
     // "Already sent" is per project: the same page may be saved into another project's sheet.
@@ -60,6 +61,19 @@ async function post(team, batch) {
     if (!response.ok) fail(`HTTP ${response.status}`)
     return text === 'OK' ? [{ ok: true }] : fail(text.slice(0, 300))
   }
+  if (batch[0].kind === 'query') {
+    // Queries tab: appended through the bridge's generic tab push, so an already deployed bridge needs no update.
+    // ponytail: the header row is written by whoever finds the tab missing; two first-ever saves at once would write it twice.
+    const json = async body => {
+      const response = await request(body)
+      if (!response.ok) fail(`HTTP ${response.status}`)
+      const reply = await response.json()
+      return reply.ok === false ? fail(reply.error || 'Bad reply from the bridge') : reply
+    }
+    const exists = ((await json({ action: 'getSheets' })).sheets || []).includes('Queries')
+    await json({ tab: 'Queries', rows: [...(exists ? [] : [batch[0].headers]), ...batch.map(i => i.row)] })
+    return batch.map(() => ({ ok: true }))
+  }
   const response = await request({ action: 'dataBatch', sheetName: 'Archive', items: batch.map(i => ({ capture: i.capture })) })
   if (!response.ok) fail(`HTTP ${response.status}`)
   const reply = await response.json()
@@ -79,7 +93,7 @@ async function drain() {
       if (!active.length) return
       const head = active[0]
       const team = head.team || current
-      const batch = head.kind === 'canary' ? [head] : active.filter(i => i.kind === 'capture' && (i.team || current).url === team.url && (i.team || current).token === team.token).slice(0, BATCH)
+      const batch = head.kind === 'canary' ? [head] : active.filter(i => i.kind === head.kind && (i.team || current).url === team.url && (i.team || current).token === team.token).slice(0, BATCH)
       let results, failure
       try {
         if (!configured(team)) throw { message: 'Team not configured', fatal: true }

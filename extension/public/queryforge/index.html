@@ -1,0 +1,1572 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pipeline · Queries</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..900&family=IBM+Plex+Mono:wght@500;600&family=Public+Sans:wght@400..700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      /* Structure: near-black ink, two off-white fills, one hairline gray.
+         No blue, no gold — status is carried by weight and fill, not hue. */
+      --ink:       #131210;
+      --muted:     #58554C;
+      --paper:     #FFFFFF;
+      --card-bg:   #FFFFFF;
+      --hover-bg:  #F2F0E9;
+      --chip-bg:   #EFEDE5;
+      --border:    #DDDAD0;
+      /* Reserved for hard failures only — a network error, a bad key.
+         Never used for information, decoration, or large fills. */
+      --alert:     #8C3524;
+      --alert-bg:  #F8F1ED;
+      --r: 3px;
+      --display:  'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif;
+      --sans:     'Roboto', -apple-system, BlinkMacSystemFont, sans-serif;
+      --mono:     ui-monospace, SFMono-Regular, monospace;
+      /* kept for any lingering var(--serif) reference — same face as --display */
+      --serif:    'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--paper);
+      color: var(--ink);
+      font-family: var(--sans);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--paper);
+      padding: 0 32px;
+      display: flex;
+      align-items: stretch;
+      justify-content: space-between;
+      gap: 20px;
+      flex-shrink: 0;
+      border-bottom: 2px solid var(--ink);
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    /* A registration mark, not a mascot — the same motif reappears in
+       miniature on the query plate below. */
+    .header-seal {
+      width: 30px;
+      height: 30px;
+      background: var(--ink);
+      border-radius: 50%;
+      position: relative;
+      flex-shrink: 0;
+    }
+    .header-seal::before, .header-seal::after { content: ''; position: absolute; background: var(--paper); }
+    .header-seal::before { top: 50%; left: 7px; right: 7px; height: 1px; transform: translateY(-50%); }
+    .header-seal::after  { left: 50%; top: 7px; bottom: 7px; width: 1px; transform: translateX(-50%); }
+
+    .masthead {
+      font-family: var(--display);
+      font-size: 1.7rem;
+      font-weight: 600;
+      color: var(--ink);
+      letter-spacing: -0.01em;
+      line-height: 1;
+      padding: 18px 0;
+    }
+
+    .masthead span { text-decoration: underline; text-decoration-color: var(--border); text-decoration-thickness: 3px; text-underline-offset: 6px; }
+
+    .header-actions { display: flex; align-items: center; }
+    .ledger-open-btn {
+      font-family: var(--mono); font-size: 0.68rem; font-weight: 600; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--ink); background: none; border: 1px solid var(--border);
+      padding: 8px 11px; cursor: pointer; border-radius: var(--r); transition: all 0.12s;
+    }
+    .ledger-open-btn:hover { border-color: var(--ink); background: var(--hover-bg); }
+    .ledger-count {
+      display: inline-flex; align-items: center; justify-content: center; min-width: 19px; height: 19px;
+      margin-left: 6px; padding: 0 5px; color: var(--paper); background: var(--ink); border-radius: 10px;
+      font-size: 0.58rem; letter-spacing: 0;
+    }
+
+    /* ── App layout ── */
+    #app {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+      min-height: 0;
+    }
+
+    /* ── Builder ── */
+    #builder {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      padding: 40px 8% 120px;
+      min-width: 0;
+    }
+
+    /* Step label — a running head, not a badge. The trailing rule is the
+       one borrowed newsroom device, and it only appears where a real
+       (if optional) sequence exists. */
+    .step-label {
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--ink);
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .step-label.space-between { justify-content: space-between; }
+    .step-label:not(.space-between)::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+      margin-left: 2px;
+    }
+
+    .step-num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 20px;
+      height: 20px;
+      padding: 0 5px;
+      background: var(--ink);
+      color: var(--paper);
+      font-size: 0.65rem;
+      font-weight: 600;
+      border-radius: var(--r);
+      flex-shrink: 0;
+    }
+
+    .step-opt {
+      font-family: var(--sans);
+      text-transform: none;
+      letter-spacing: 0;
+      font-size: 0.68rem;
+      color: var(--muted);
+      font-weight: 400;
+    }
+
+    /* Step status — a configured step dims and its number chip becomes a ✓,
+       with a muted one-line summary of what was entered. Hovering or tabbing
+       back into the section restores full strength, so revisiting a finished
+       step never feels disabled. */
+    .step-section { transition: opacity 0.15s; }
+    .step-section.step-done { opacity: 0.45; }
+    .step-section.step-done:hover,
+    .step-section.step-done:focus-within { opacity: 1; }
+
+    .step-status {
+      font-family: var(--sans);
+      text-transform: none;
+      letter-spacing: 0;
+      font-size: 0.68rem;
+      font-weight: 400;
+      color: var(--muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 34ch;
+    }
+
+    .step-hint {
+      font-family: var(--sans);
+      font-size: 0.95rem;
+      font-weight: 400;
+      color: var(--muted);
+      margin-bottom: 14px;
+      line-height: 1.6;
+      max-width: 68ch;
+    }
+
+    .step-hint b {
+      color: var(--ink);
+      font-weight: 600;
+    }
+
+    .step-hint code {
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      background: var(--chip-bg);
+      padding: 1px 5px;
+      border-radius: 2px;
+    }
+
+    .site-count-note {
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-left: auto;
+    }
+
+    .site-count-note.warn { color: var(--ink); font-weight: 600; }
+
+    /* ── Sections ── */
+    .section-block { margin-top: 36px; }
+
+    /* ── Source doors (pick a way to load) ── */
+    .doors {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+    @media (max-width: 640px) { .doors { grid-template-columns: 1fr; } }
+
+    .door {
+      font-family: var(--sans);
+      border: 1px solid var(--border);
+      background: var(--card-bg);
+      border-radius: var(--r);
+      padding: 14px 16px;
+      text-align: left;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      transition: border-color 0.12s, box-shadow 0.12s;
+    }
+    .door:hover { border-color: var(--ink); }
+    .door[aria-expanded="true"] {
+      border-color: var(--ink);
+      box-shadow: inset 3px 0 0 var(--ink);
+    }
+    .door-t { font-weight: 600; font-size: 0.95rem; color: var(--ink); }
+    .door-s { font-size: 0.78rem; color: var(--muted); }
+
+    .panel {
+      border: 1px solid var(--border);
+      border-top: none;
+      background: var(--card-bg);
+      padding: 16px;
+      border-radius: 0 0 var(--r) var(--r);
+      margin-top: -1px;
+    }
+    .panel[hidden] { display: none; }
+
+    .field { margin-bottom: 12px; }
+    .field:last-child { margin-bottom: 0; }
+    .field label {
+      display: block;
+      font-family: var(--mono);
+      font-size: 0.62rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      margin-bottom: 5px;
+    }
+
+    .trio { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+    @media (max-width: 640px) { .trio { grid-template-columns: 1fr; } }
+
+    input[type=text], input[type=url], input[type=password], select {
+      font-family: var(--sans);
+      font-size: 0.92rem;
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 9px 11px;
+      color: var(--ink);
+      width: 100%;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    input:focus, select:focus { border-color: var(--ink); box-shadow: 0 0 0 3px rgba(19,18,16,0.1); }
+
+    textarea.paste-box {
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 9px 11px;
+      color: var(--ink);
+      width: 100%;
+      min-height: 150px;
+      resize: vertical;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    textarea.paste-box:focus { border-color: var(--ink); box-shadow: 0 0 0 3px rgba(19,18,16,0.1); }
+
+    /* ── Question fields (step 2) ──
+       The form asks in plain language; the operator each answer becomes
+       rides along in the hint, so every field teaches its own syntax. */
+    .q-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 16px; margin-top: 6px; }
+    @media (max-width: 760px) { .q-fields { grid-template-columns: 1fr; } }
+    .q-field label {
+      font-family: var(--sans); font-size: 0.88rem; font-weight: 600;
+      color: var(--ink); text-transform: none; letter-spacing: 0; margin-bottom: 6px;
+    }
+    .q-hint { font-size: 0.78rem; color: var(--muted); margin: 6px 0 0; line-height: 1.5; }
+    .q-op {
+      font-family: var(--mono); font-size: 0.68rem; background: var(--chip-bg);
+      padding: 1px 5px; border-radius: 4px; margin-left: 4px; white-space: nowrap; color: var(--ink);
+    }
+    .q-dates { display: flex; align-items: center; gap: 8px; }
+    .q-date-tag {
+      font-family: var(--mono); font-size: 0.62rem; text-transform: uppercase;
+      letter-spacing: 0.1em; color: var(--muted);
+    }
+    .q-dates input[type="date"] {
+      font-family: var(--sans); font-size: 0.92rem; background: white; border: 1px solid var(--border);
+      border-radius: var(--r); padding: 8px 10px; color: var(--ink); width: 100%; min-width: 0; outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .q-dates input[type="date"]:focus { border-color: var(--ink); box-shadow: 0 0 0 3px rgba(19,18,16,0.1); }
+    .op-filters-label {
+      font-family: var(--mono); font-size: 0.62rem; text-transform: uppercase;
+      letter-spacing: 0.1em; color: var(--muted); margin: 18px 0 8px;
+    }
+
+    /* ── country combobox ──
+       259 countries can't be a <select>. Same hairline vocabulary as the
+       fields it sits beside; the count column is mono so the numbers line
+       up as a column you can scan rather than read. */
+    .combo { position: relative; }
+    .combo input { padding-right: 30px; }
+    .combo-clear {
+      position: absolute; top: 0; right: 0; height: 100%; width: 28px;
+      background: none; border: none; cursor: pointer; color: var(--muted);
+      font-size: 1.05rem; line-height: 1; padding: 0;
+    }
+    .combo-clear:hover { color: var(--ink); }
+    .combo-list {
+      position: absolute; z-index: 40; top: calc(100% + 3px); left: 0; right: 0;
+      max-height: 274px; overflow-y: auto; list-style: none;
+      background: var(--card-bg); border: 1px solid var(--ink);
+      border-radius: var(--r); box-shadow: 0 6px 20px rgba(19,18,16,0.13);
+    }
+    .combo-list[hidden] { display: none; }
+    .combo-opt {
+      display: flex; align-items: baseline; gap: 8px;
+      padding: 7px 11px; cursor: pointer; font-size: 0.88rem;
+    }
+    .combo-opt .combo-name { flex: 1; }
+    .combo-opt .combo-count {
+      font-family: var(--mono); font-size: 0.66rem; color: var(--muted);
+      white-space: nowrap; letter-spacing: 0.04em;
+    }
+    .combo-opt.active, .combo-opt:hover { background: var(--hover-bg); }
+    .combo-opt[aria-selected="true"] .combo-name { font-weight: 700; }
+    /* Present but empty: still selectable, because "this database has
+       nothing here" is worth being able to confirm. */
+    .combo-opt.muted .combo-name { color: var(--muted); }
+    .combo-head {
+      padding: 7px 11px 4px; font-family: var(--mono); font-size: 0.6rem;
+      text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted);
+      border-top: 1px solid var(--border); margin-top: 3px;
+    }
+    .combo-empty { padding: 9px 11px; font-size: 0.85rem; color: var(--muted); }
+    .fieldhint {
+      font-family: var(--mono); font-size: 0.62rem; color: var(--muted);
+      margin-top: 5px; letter-spacing: 0.04em;
+    }
+    .fieldhint:empty { display: none; }
+
+    .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .grow { flex: 1; min-width: 180px; }
+
+    .btn-primary {
+      font-family: var(--sans);
+      font-size: 0.85rem;
+      font-weight: 600;
+      border: 1px solid var(--ink);
+      background: var(--ink);
+      color: var(--paper);
+      padding: 10px 20px;
+      cursor: pointer;
+      white-space: nowrap;
+      border-radius: var(--r);
+      transition: background-color 0.12s, transform 0.08s;
+    }
+    .btn-primary:hover { background: #2A2822; border-color: #2A2822; }
+    .btn-primary:active { transform: translateY(1px); }
+    .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+    .btn-ghost {
+      font-family: var(--sans);
+      font-size: 0.85rem;
+      font-weight: 500;
+      border: 1px solid var(--border);
+      background: none;
+      color: var(--muted);
+      padding: 9px 14px;
+      cursor: pointer;
+      border-radius: var(--r);
+      transition: all 0.12s;
+    }
+    .btn-ghost:hover { border-color: var(--ink); color: var(--ink); background: var(--hover-bg); }
+    .btn-ghost:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ── fetch warning + progress bar ── */
+    .fetch-warning {
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-top: 10px;
+      line-height: 1.5;
+    }
+    .progress-track {
+      margin-top: 8px;
+      height: 6px;
+      width: 100%;
+      max-width: 320px;
+      background: var(--chip-bg);
+      border-radius: var(--r);
+      overflow: hidden;
+      position: relative;
+    }
+    .progress-track[hidden] { display: none; }
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: var(--ink);
+      border-radius: var(--r);
+      transition: width 0.3s ease;
+    }
+    .progress-track.indeterminate .progress-fill { display: none; }
+    .progress-track.indeterminate::after {
+      content: '';
+      position: absolute;
+      top: 0; left: -30%;
+      height: 100%;
+      width: 30%;
+      background: var(--ink);
+      border-radius: var(--r);
+      animation: progress-indeterminate 1.1s ease-in-out infinite;
+    }
+    @keyframes progress-indeterminate {
+      0%   { left: -30%; }
+      50%  { left: 60%; }
+      100% { left: 100%; }
+    }
+    /* ── notices ──
+       Plain notices: a black rule and a quiet fill — read as information.
+       .warn escalates the SAME information (thin sourcing, a dropped
+       region, a long query) — heavier rule, still grayscale, no verdict.
+       .error is reserved for things that actually failed — the one place
+       the alert ink appears, always paired with an explicit label. */
+    .notice {
+      border-left: 2px solid var(--ink);
+      padding: 9px 12px;
+      margin-top: 12px;
+      font-size: 0.85rem;
+      color: var(--ink);
+      background: var(--hover-bg);
+      border-radius: 0 var(--r) var(--r) 0;
+      line-height: 1.55;
+    }
+    .notice.warn {
+      border-left-width: 4px;
+      background: var(--chip-bg);
+    }
+    .notice.error {
+      border-left-width: 4px;
+      border-left-color: var(--alert);
+      background: var(--alert-bg);
+    }
+    .notice.error::before {
+      content: 'Error — ';
+      font-family: var(--mono);
+      font-weight: 700;
+      font-size: 0.68rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--alert);
+    }
+    .notice strong { font-weight: 700; }
+    .notice code {
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      background: rgba(0,0,0,.06);
+      padding: 1px 5px;
+      border-radius: 2px;
+    }
+    .notice a { color: var(--ink); }
+    .notice[hidden] { display: none; }
+
+    /* ── vault bar (in the Sources step) ── */
+    .vault-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 14px;
+      flex-wrap: wrap;
+    }
+    .vault-count {
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+
+    /* Terms input — the one required field, sized up accordingly */
+    #terms {
+      width: 100%;
+      font-family: var(--sans);
+      font-size: 1.2rem;
+      font-weight: 500;
+      border: 2px solid var(--ink);
+      background: white;
+      color: var(--ink);
+      padding: 14px 18px;
+      outline: none;
+      border-radius: var(--r);
+      transition: box-shadow 0.15s;
+    }
+    #terms:focus { box-shadow: 0 0 0 3px rgba(19,18,16,0.12); }
+    #terms::placeholder { color: var(--muted); font-weight: 400; }
+
+    /* Examples — dashed border reads as "suggestion", not yet committed */
+    .examples-row {
+      display: flex; align-items: center; gap: 8px;
+      flex-wrap: wrap; margin-bottom: 12px;
+    }
+    .examples-label { font-family: var(--mono); font-size: 0.7rem; color: var(--muted); letter-spacing: 0.06em; }
+    .example-btn {
+      font-family: var(--sans); font-size: 0.8rem; font-weight: 500;
+      border: 1px dashed var(--muted); background: none; color: var(--muted);
+      padding: 4px 11px; cursor: pointer; border-radius: var(--r); transition: all 0.12s;
+    }
+    .example-btn:hover { border-style: solid; border-color: var(--ink); background: var(--hover-bg); color: var(--ink); }
+
+    /* Operator buttons — the active one presses in, like a keyed switch */
+    .op-buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+    .op-btn {
+      font-family: var(--sans); border: 1px solid var(--border);
+      background: var(--paper); color: var(--ink);
+      padding: 6px 12px; cursor: pointer; border-radius: var(--r); transition: all 0.12s;
+      position: relative; display: inline-flex; flex-direction: column;
+      align-items: flex-start; gap: 1px; text-align: left; line-height: 1.25;
+    }
+    .op-name { font-size: 0.82rem; font-weight: 500; }
+    .op-syn  { font-family: var(--mono); font-size: 0.6rem; color: var(--muted); letter-spacing: 0.02em; }
+    .op-btn:hover { border-color: var(--ink); }
+    .op-btn.active { border-color: var(--ink); background: var(--ink); color: var(--paper); }
+    .op-btn.active .op-syn { color: rgba(241,239,234,0.62); }
+    .op-btn[data-tip]:hover::after {
+      content: attr(data-tip); position: absolute; bottom: calc(100% + 6px); left: 50%;
+      transform: translateX(-50%); background: var(--ink); color: var(--paper);
+      font-family: var(--sans); font-weight: 400; font-size: 0.72rem;
+      padding: 6px 10px; border-radius: var(--r); white-space: nowrap; pointer-events: none;
+      z-index: 10; letter-spacing: 0; text-transform: none;
+    }
+
+    /* Operator panel */
+    #opPanel {
+      display: none; background: var(--hover-bg); border: 1px solid var(--border);
+      padding: 10px 14px; margin-bottom: 10px; align-items: center; gap: 10px; flex-wrap: wrap;
+      border-radius: var(--r);
+    }
+    #opPanel.visible { display: flex; }
+    .op-panel-label { font-family: var(--mono); font-size: 0.7rem; color: var(--ink); font-weight: 600; white-space: nowrap; }
+    #opPanelInput, #opPanelSelect {
+      font-family: var(--mono); font-size: 0.9rem; border: 1px solid var(--border);
+      background: white; padding: 6px 10px; color: var(--ink); outline: none; min-width: 180px; border-radius: 2px; width: auto;
+    }
+    #opPanelInput:focus, #opPanelSelect:focus { border-color: var(--ink); }
+    .op-add-btn {
+      font-family: var(--sans); font-size: 0.72rem; font-weight: 600; border: 1px solid var(--ink);
+      background: var(--ink); color: var(--paper); padding: 5px 12px; cursor: pointer; border-radius: var(--r); transition: all 0.12s;
+    }
+    .op-add-btn:hover { background: #2A2822; border-color: #2A2822; }
+    .op-cancel-btn {
+      font-family: var(--sans); font-size: 0.72rem; border: 1px solid var(--border);
+      background: none; color: var(--muted); padding: 5px 10px; cursor: pointer; border-radius: var(--r); transition: all 0.12s;
+    }
+    .op-cancel-btn:hover { border-color: var(--ink); color: var(--ink); }
+
+    /* Op chips — solid border: a committed modifier */
+    #opChips { display: flex; flex-wrap: wrap; gap: 6px; }
+    #opChips:empty { display: none; }
+    .op-chip {
+      font-family: var(--mono); font-size: 0.82rem; background: var(--paper);
+      border: 1px solid var(--ink); color: var(--ink);
+      padding: 5px 8px 5px 12px; border-radius: var(--r); display: inline-flex; align-items: center; gap: 8px;
+      animation: chipPop 0.2s cubic-bezier(0.34,1.56,0.64,1);
+    }
+    .chip-x { background: none; border: none; color: inherit; cursor: pointer; font-size: 0.65rem; padding: 0; opacity: 0.55; line-height: 1; transition: opacity 0.12s; }
+    .chip-x:hover { opacity: 1; }
+
+    /* Sites chips — dashed border: a boundary/filter, not a modifier */
+    .site-chips-row { display: flex; flex-wrap: wrap; gap: 7px; min-height: 0; }
+    .site-chips-row:not(:empty) { margin-bottom: 9px; }
+    .site-chip {
+      font-family: var(--mono); font-size: 0.82rem; background: var(--paper);
+      border: 1px dashed var(--ink); color: var(--ink);
+      padding: 5px 8px 5px 12px; border-radius: var(--r); display: inline-flex; align-items: center; gap: 7px;
+      animation: chipPop 0.2s cubic-bezier(0.34,1.56,0.64,1); white-space: nowrap;
+    }
+    @keyframes chipPop { from { transform: scale(0.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+    .domain-row { display: flex; gap: 8px; margin-top: 10px; }
+    #domainInput {
+      flex: 1; font-family: var(--mono); font-size: 0.9rem; border: 1px solid var(--border);
+      background: white; padding: 10px 14px; color: var(--ink); outline: none; transition: border-color 0.15s; border-radius: var(--r);
+    }
+    #domainInput:focus { border-color: var(--ink); }
+    #domainInput::placeholder { color: var(--muted); }
+    .domain-add-btn {
+      font-family: var(--sans); font-size: 0.85rem; font-weight: 600; border: 1px solid var(--ink);
+      background: var(--ink); color: var(--paper); padding: 10px 20px; cursor: pointer; white-space: nowrap; transition: all 0.12s; border-radius: var(--r);
+    }
+    .domain-add-btn:hover { background: #2A2822; border-color: #2A2822; }
+
+    /* Preview */
+    .preview-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+    .preview-label { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink); font-weight: 600; }
+    .copy-btn {
+      font-family: var(--sans); font-size: 0.78rem; font-weight: 500; border: 1px solid var(--border);
+      background: var(--paper); color: var(--muted); padding: 5px 14px; cursor: pointer; border-radius: var(--r);
+      transition: all 0.12s; white-space: nowrap; flex-shrink: 0;
+    }
+    .copy-btn:hover { border-color: var(--ink); color: var(--ink); background: var(--hover-bg); }
+
+    /* The forge plate — where terms get pressed into machine syntax.
+       Corner ticks are a printer's registration mark, echoing the header
+       mark; the one deliberately dark surface in an otherwise flat page. */
+    #preview {
+      position: relative;
+      background: var(--ink); color: #F1EFEA; font-family: var(--mono); font-size: 0.95rem; font-weight: 500;
+      padding: 24px 26px; min-height: 76px; line-height: 1.9; word-break: break-word; white-space: pre-wrap;
+      border-radius: var(--r) var(--r) 0 0;
+    }
+    #preview::before, #preview::after {
+      content: ''; position: absolute; width: 10px; height: 10px; border: 1px solid rgba(255,255,255,0.3);
+    }
+    #preview::before { top: 9px; left: 9px; border-right: none; border-bottom: none; }
+    #preview::after  { bottom: 9px; right: 9px; border-left: none; border-top: none; }
+    .preview-empty { color: rgba(255,255,255,0.32); font-family: var(--sans); font-weight: 400; }
+
+    /* The human read-back — set in the display face, on paper, directly
+       beneath the plate: machine syntax above, plain language below. */
+    #translation {
+      font-family: var(--display); font-weight: 400; font-size: 1.08rem; color: var(--ink);
+      line-height: 1.6; padding: 16px 22px; background: var(--hover-bg); border: 1px solid var(--border);
+      border-top: 2px solid var(--ink); border-radius: 0 0 var(--r) var(--r); margin-bottom: 0; transition: opacity 0.15s;
+    }
+    #translation.empty { color: var(--muted); opacity: 0.8; }
+    #translation b { font-weight: 600; color: var(--ink); }
+
+    /* Syntax highlighting — grayscale hierarchy by weight and opacity,
+       not hue: boilerplate (site:) recedes, operators and keywords lead. */
+    .hl-site   { color: rgba(241,239,234,0.55); }
+    .hl-op     { color: #F1EFEA; font-weight: 600; }
+    .hl-kw     { color: #F1EFEA; font-weight: 600; text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 3px; text-decoration-color: rgba(241,239,234,0.4); }
+    .hl-paren  { color: rgba(241,239,234,0.3); }
+
+    /* Budget bar — fill darkens as the query grows; a hazard hatch
+       (not a color) marks the point where Google starts truncating. */
+    .budget-row { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
+    .budget-track { flex: 1; height: 4px; background: var(--chip-bg); border-radius: 2px; overflow: hidden; }
+    .budget-fill { height: 100%; border-radius: 2px; width: 0%; background: var(--border); transition: width 0.3s ease, background-color 0.3s ease; }
+    .budget-fill.amber { background: var(--muted); }
+    .budget-fill.red   {
+      background-color: var(--ink);
+      background-image: repeating-linear-gradient(135deg, rgba(255,255,255,0.25) 0 3px, transparent 3px 7px);
+      animation: budgetPulse 1.6s ease-in-out infinite;
+    }
+    @keyframes budgetPulse { 0%,100%{opacity:1} 50%{opacity:0.6} }
+    .budget-label { font-family: var(--mono); font-size: 0.6rem; color: var(--muted); white-space: nowrap; letter-spacing: 0.04em; }
+
+    /* ── Vault sidebar ── */
+    #vault {
+      width: 0; flex-shrink: 0; overflow: hidden; transition: width 0.3s ease;
+      border-left: 2px solid transparent; display: flex; flex-direction: column; background: var(--card-bg);
+    }
+    #vault.open { width: 400px; border-left-color: var(--ink); }
+
+    .vault-header { padding: 16px 18px 14px; border-bottom: 1px solid var(--border); flex-shrink: 0; background: var(--card-bg); }
+    .vault-title-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .vault-title { font-family: var(--display); font-size: 1.05rem; font-weight: 600; color: var(--ink); }
+    .vault-close-btn {
+      background: none; border: 1px solid var(--border); width: 26px; height: 26px;
+      display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 0.75rem;
+      color: var(--muted); transition: all 0.12s; flex-shrink: 0; border-radius: var(--r);
+    }
+    .vault-close-btn:hover { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+
+    .vault-tools { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
+    .vault-tool-btn {
+      font-family: var(--sans); font-size: 0.72rem; font-weight: 500; letter-spacing: 0.01em;
+      border: 1px solid var(--border); background: none; color: var(--muted);
+      padding: 4px 9px; cursor: pointer; border-radius: var(--r); transition: all 0.12s;
+    }
+    .vault-tool-btn:hover { border-color: var(--ink); color: var(--ink); background: var(--hover-bg); }
+    .vault-tool-count { margin-left: auto; font-family: var(--mono); font-size: 0.65rem; color: var(--muted); }
+
+    #vaultFilter {
+      width: 100%; font-family: var(--sans); font-size: 0.85rem; border: 1px solid var(--border);
+      background: white; padding: 8px 12px; color: var(--ink); outline: none; transition: border-color 0.15s; border-radius: var(--r);
+    }
+    #vaultFilter:focus { border-color: var(--ink); }
+    #vaultFilter::placeholder { color: var(--muted); }
+
+    .vault-body { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 0 12px; }
+    .vault-status { font-family: var(--sans); font-size: 0.82rem; color: var(--muted); text-align: center; padding: 28px 18px; line-height: 1.6; }
+
+    .vgroup { border-bottom: 1px solid var(--border); }
+    .vgroup:last-child { border-bottom: none; }
+    .vgroup-head {
+      position: sticky; top: 0; z-index: 2; background: var(--hover-bg);
+      border-bottom: 1px solid var(--border); padding: 8px 14px;
+      display: flex; align-items: center; gap: 8px;
+      font-family: var(--sans); font-size: 0.75rem;
+    }
+    .vgroup-head input[type=checkbox] { width: auto; flex-shrink: 0; accent-color: var(--ink); cursor: pointer; }
+    .vgroup-name { flex: 1; color: var(--ink); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .vgroup-remove { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 0.7rem; padding: 0 2px; flex-shrink: 0; }
+    .vgroup-remove:hover { color: var(--ink); }
+
+    .vitem {
+      display: flex; align-items: center; gap: 9px; padding: 6px 14px;
+      border-bottom: 1px solid var(--paper); font-size: 0.82rem; transition: background-color 0.1s;
+    }
+    .vitem:hover { background: var(--hover-bg); }
+    .vitem:last-child { border-bottom: none; }
+    .vitem input[type=checkbox] { width: auto; flex-shrink: 0; accent-color: var(--ink); cursor: pointer; }
+    .vitem .dom { font-family: var(--mono); font-size: 0.78rem; color: var(--ink); text-decoration: none; }
+    .vitem a.dom:hover { text-decoration: underline; }
+    .vitem .nm { color: var(--muted); font-size: 0.75rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+    .vitem.off .dom, .vitem.off .nm { opacity: 0.4; text-decoration: line-through; }
+    .vitem[hidden] { display: none; }
+
+    /* Confidence tags — fill weight stands in for certainty. The more
+       filled the badge, the more official the paper trail behind it. */
+    .tag {
+      font-family: var(--mono); font-size: 0.56rem; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.06em;
+      padding: 3px 6px; border-radius: 2px; white-space: nowrap; flex-shrink: 0;
+      border: 1px solid var(--ink);
+    }
+    .tag.custom        { background: var(--paper); color: var(--muted); border-color: var(--border); }
+    .tag.inferred       { background: var(--paper); color: var(--ink); border-style: dashed; }
+    .tag.asserted        { background: var(--chip-bg); color: var(--ink); }
+    .tag.authoritative { background: var(--ink); color: var(--paper); }
+
+    /* CSV load row already handled by .row / inputs above */
+
+    /* Mobile overlay */
+    .vault-overlay { display: none; position: fixed; inset: 0; background: rgba(19,18,16,0.45); z-index: 199; }
+    @media (max-width: 700px) {
+      .vault-overlay.visible { display: block; }
+      #vault {
+        position: fixed; top: 0; right: 0; height: 100vh; width: 0 !important; z-index: 200;
+        box-shadow: -8px 0 28px rgba(19,18,16,0.18); transition: width 0.3s ease;
+      }
+      #vault.open { width: 92vw !important; max-width: 380px !important; }
+    }
+
+    /* Action row */
+    .action-row { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 20px; align-items: center; }
+    .btn-clear {
+      font-family: var(--sans); font-size: 0.85rem; font-weight: 500; border: 1px solid var(--border);
+      background: none; color: var(--muted); padding: 12px 20px; cursor: pointer; transition: all 0.15s; border-radius: var(--r);
+    }
+    .btn-clear:hover { border-color: var(--alert); color: var(--alert); }
+    .btn-save-ledger {
+      font-family: var(--sans); font-size: 0.85rem; font-weight: 500; border: 1px solid var(--border);
+      background: none; color: var(--ink); padding: 12px 20px; cursor: pointer; transition: all 0.15s; border-radius: var(--r);
+    }
+    .btn-save-ledger:hover { border-color: var(--ink); background: var(--hover-bg); }
+
+    .batchnav { display: flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 0.72rem; color: var(--muted); }
+    .batchnav[hidden] { display: none; }
+    .batchnav button {
+      font-family: var(--mono); font-size: 0.8rem; border: 1px solid var(--border);
+      background: var(--chip-bg); color: var(--ink); padding: 5px 11px; cursor: pointer; border-radius: var(--r); transition: all 0.12s;
+    }
+    .batchnav button:hover:not(:disabled) { border-color: var(--ink); }
+    .batchnav button:disabled { opacity: 0.35; cursor: default; }
+
+    /* The one hero action — Fraunces at weight, and a physical "press"
+       on click rather than a colored shadow doing the work. */
+    .search-wrap { margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
+    .btn-search {
+      font-family: var(--display); font-size: 1.15rem; font-weight: 600; border: 2px solid var(--ink);
+      background: var(--ink); color: var(--paper); padding: 13px 34px; cursor: pointer;
+      transition: transform 0.08s, background-color 0.12s; letter-spacing: 0.005em; border-radius: var(--r);
+    }
+    .btn-search:hover { background: #2A2822; border-color: #2A2822; }
+    .btn-search:active { transform: translateY(2px); }
+    .search-note { font-family: var(--mono); font-size: 0.68rem; color: var(--muted); letter-spacing: 0.04em; }
+    .search-btns { display: flex; gap: 10px; align-items: center; }
+    .btn-sweep {
+      font-family: var(--sans); font-size: 0.85rem; font-weight: 500; border: 1px solid var(--ink);
+      background: none; color: var(--ink); padding: 12px 20px; cursor: pointer; transition: all 0.15s; border-radius: var(--r);
+    }
+    .btn-sweep:hover { background: var(--ink); color: var(--paper); }
+
+    /* ── Simple mode ──
+       A deliberately narrow front door: one query, one launch action,
+       with the sweep and the private ledger kept within reach. */
+    #simpleMode {
+      display: none;
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      padding: clamp(56px, 12vh, 150px) 8% 96px;
+    }
+    body.simple-mode #app { display: none; }
+    body.simple-mode #simpleMode { display: flex; justify-content: center; }
+    /* The chooser is a true first screen: the search surfaces stay out of
+       sight and out of the keyboard order until a mode is selected. */
+    body.mode-choice > header,
+    body.mode-choice #app,
+    body.mode-choice #simpleMode { display: none; }
+    .simple-shell { width: 100%; max-width: 760px; }
+    .simple-copy { max-width: 52ch; color: var(--muted); font-size: 1rem; line-height: 1.6; margin-bottom: 32px; }
+    .simple-form { display: flex; gap: 10px; align-items: stretch; }
+    .simple-input {
+      min-width: 0; flex: 1; font-family: var(--sans); font-size: 1.08rem; color: var(--ink);
+      border: 2px solid var(--ink); border-radius: var(--r); padding: 15px 17px; background: var(--paper);
+    }
+    .simple-input::placeholder { color: var(--muted); opacity: 1; }
+    .simple-input:focus { outline: 3px solid var(--hover-bg); outline-offset: 2px; }
+    .simple-search-btn { white-space: nowrap; }
+    .simple-tools { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
+    .simple-note { color: var(--muted); font-family: var(--mono); font-size: 0.66rem; letter-spacing: 0.02em; }
+    body.simple-mode #tutorialOpen { display: none !important; }
+    body.simple-mode .ledger-open-label { display: inline; }
+
+    /* ── Mode choice ── */
+    #modeBackdrop {
+      display: none; position: fixed; inset: 0; z-index: 700; padding: 20px;
+      align-items: center; justify-content: center; background: rgba(19,18,16,0.6);
+    }
+    #modeBackdrop.visible { display: flex; }
+    #modeCard {
+      width: 100%; max-width: 650px; background: var(--card-bg); border: 1px solid var(--border);
+      border-radius: var(--r); box-shadow: 0 24px 60px -12px rgba(19,18,16,0.4); overflow: hidden;
+    }
+    .mode-body { padding: 30px; }
+    .mode-title { font-family: var(--display); font-size: 1.5rem; font-weight: 600; letter-spacing: -0.02em; margin-bottom: 9px; }
+    .mode-copy { max-width: 55ch; color: var(--muted); font-size: 0.92rem; line-height: 1.55; }
+    .mode-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 24px; }
+    .mode-option {
+      text-align: left; background: var(--paper); color: var(--ink); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 19px; cursor: pointer; transition: border-color 0.15s, background 0.15s, transform 0.15s;
+    }
+    .mode-option:hover { border-color: var(--ink); background: var(--hover-bg); transform: translateY(-2px); }
+    .mode-option:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+    .mode-option-title { display: block; font-family: var(--display); font-size: 1.08rem; font-weight: 600; margin-bottom: 6px; }
+    .mode-option-copy { display: block; color: var(--muted); font-size: 0.82rem; line-height: 1.5; }
+
+    /* Divider */
+    .section-divider { border: none; border-top: 1px solid var(--border); margin: 36px 0 0; }
+
+    /* ── Tutorial modal ──
+       Real elevation for a real overlay: a soft blurred shadow, not a
+       hard colored one — this is the one place a shadow is doing actual
+       work (lifting the card off a scrim) rather than decorating a flat
+       control. */
+    #tutorialBackdrop {
+      display: none; position: fixed; inset: 0; background: rgba(19,18,16,0.6); z-index: 500;
+      align-items: center; justify-content: center; padding: 20px;
+    }
+    #tutorialBackdrop.visible { display: flex; }
+    #tutorialCard {
+      background: var(--card-bg); border: 1px solid var(--border); box-shadow: 0 24px 60px -12px rgba(19,18,16,0.4);
+      width: 100%; max-width: 520px; display: flex; flex-direction: column; max-height: 90vh; overflow: hidden;
+      border-radius: var(--r);
+    }
+    .tut-header {
+      background: var(--ink); color: var(--paper); padding: 14px 20px 12px; display: flex;
+      align-items: center; justify-content: space-between; gap: 12px; flex-shrink: 0;
+    }
+    .tut-header-title { font-family: var(--display); font-size: 0.95rem; font-weight: 600; letter-spacing: 0.01em; }
+    .tut-skip {
+      font-family: var(--mono); font-size: 0.6rem; color: rgba(241,239,234,0.45); background: none; border: none;
+      cursor: pointer; letter-spacing: 0.06em; padding: 0; transition: color 0.15s; white-space: nowrap; flex-shrink: 0;
+    }
+    .tut-skip:hover { color: var(--paper); }
+    .tut-body { padding: 26px 28px 20px; flex: 1; overflow-y: auto; }
+    .tut-step-label { font-family: var(--mono); font-size: 0.6rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+    .tut-heading { font-family: var(--display); font-size: 1.3rem; font-weight: 600; color: var(--ink); line-height: 1.3; margin-bottom: 14px; }
+    .tut-text { font-family: var(--sans); font-size: 0.9rem; font-weight: 400; color: var(--ink); line-height: 1.7; margin-bottom: 16px; }
+    .tut-text b { font-weight: 600; color: var(--ink); }
+    .tut-text code { font-family: var(--mono); font-size: 0.78rem; background: var(--chip-bg); padding: 1px 5px; }
+    .tut-example {
+      background: var(--ink); color: #F1EFEA; font-family: var(--mono); font-size: 0.72rem;
+      padding: 10px 14px; line-height: 1.75; margin-bottom: 12px; border-radius: var(--r);
+    }
+    .tut-example .hl-site { color: rgba(241,239,234,0.55); }
+    .tut-example .hl-op   { color: #F1EFEA; font-weight: 600; }
+    .tut-example .hl-kw   { color: #F1EFEA; font-weight: 600; }
+    .tut-example .hl-muted{ opacity: 0.4; }
+    .tut-translation {
+      font-family: var(--display); font-size: 0.92rem; color: var(--ink); line-height: 1.6;
+      padding: 10px 14px; background: var(--hover-bg); border: 1px solid var(--border); border-radius: var(--r); margin-bottom: 16px;
+    }
+    .tut-translation b { font-weight: 600; }
+    .tut-tip {
+      background: var(--paper); border: 1px solid var(--border); font-family: var(--sans); font-weight: 500;
+      font-size: 0.78rem; color: var(--muted); padding: 8px 12px; line-height: 1.6; border-radius: var(--r);
+    }
+    .tut-footer {
+      padding: 14px 20px; border-top: 1px solid var(--border); display: flex; align-items: center;
+      gap: 12px; flex-shrink: 0; background: var(--hover-bg);
+    }
+    .tut-dots { display: flex; gap: 6px; flex: 1; }
+    .tut-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--border); transition: background 0.2s, transform 0.2s; }
+    .tut-dot.active { background: var(--ink); transform: scale(1.3); }
+    .tut-dot.done   { background: var(--muted); opacity: 0.5; }
+    .tut-btn-prev {
+      font-family: var(--sans); font-size: 0.78rem; font-weight: 500; border: 1px solid var(--border); background: none;
+      color: var(--muted); padding: 7px 14px; cursor: pointer; transition: all 0.12s; border-radius: var(--r);
+    }
+    .tut-btn-prev:hover:not(:disabled) { border-color: var(--ink); color: var(--ink); }
+    .tut-btn-prev:disabled { opacity: 0.3; cursor: default; }
+    .tut-btn-next {
+      font-family: var(--sans); font-size: 0.78rem; font-weight: 600; border: 1px solid var(--ink); background: var(--ink);
+      color: var(--paper); padding: 7px 18px; cursor: pointer; transition: all 0.12s; border-radius: var(--r);
+    }
+    .tut-btn-next:hover { background: #2A2822; border-color: #2A2822; }
+    .tut-btn-next:disabled { opacity: 0.35; cursor: default; }
+
+    /* ── Systematic Search Sweep modal ──
+       Same overlay treatment as the tutorial: real elevation over a scrim. */
+    #sweepBackdrop {
+      display: none; position: fixed; inset: 0; background: rgba(19,18,16,0.6); z-index: 500;
+      align-items: center; justify-content: center; padding: 20px;
+    }
+    #sweepBackdrop.visible { display: flex; }
+    #sweepCard {
+      background: var(--card-bg); border: 1px solid var(--border); box-shadow: 0 24px 60px -12px rgba(19,18,16,0.4);
+      width: 100%; max-width: 560px; display: flex; flex-direction: column; max-height: 90vh; overflow: hidden;
+      border-radius: var(--r);
+    }
+    .sweep-inputs { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
+    .sweep-field { display: flex; flex-direction: column; gap: 6px; }
+    .sweep-field > label { font-family: var(--mono); font-size: 0.6rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+    .sweep-field input, .sweep-field select {
+      font-family: var(--mono); font-size: 0.8rem; color: var(--ink); background: var(--paper);
+      border: 1px solid var(--border); padding: 7px 10px; border-radius: var(--r);
+    }
+    .sweep-field input:focus, .sweep-field select:focus { outline: 2px solid var(--ink); outline-offset: 1px; }
+    .sweep-size-row { display: flex; gap: 6px; }
+    .sweep-size-row input { width: 58px; }
+    .sweep-summary { font-family: var(--mono); font-size: 0.72rem; color: var(--muted); margin-bottom: 10px; min-height: 1em; }
+    .sweep-summary b { color: var(--ink); }
+    .sweep-list { border: 1px solid var(--border); border-radius: var(--r); max-height: 240px; overflow-y: auto; margin-bottom: 14px; background: var(--paper); }
+    .sweep-row { display: flex; align-items: center; gap: 10px; padding: 7px 12px; border-bottom: 1px solid var(--border); font-family: var(--mono); font-size: 0.74rem; color: var(--ink); }
+    .sweep-row:last-child { border-bottom: none; }
+    .sweep-row-num { color: var(--muted); min-width: 2.5ch; text-align: right; flex-shrink: 0; }
+    .sweep-row-dates { flex: 1; }
+    .sweep-row.done .sweep-row-dates { color: var(--muted); text-decoration: line-through; }
+    .sweep-row input[type="checkbox"] { accent-color: var(--ink); width: 14px; height: 14px; cursor: pointer; flex-shrink: 0; margin: 0; }
+    .sweep-open {
+      font-family: var(--mono); font-size: 0.68rem; border: 1px solid var(--border); background: none;
+      color: var(--ink); padding: 4px 10px; cursor: pointer; border-radius: var(--r); transition: all 0.12s; flex-shrink: 0;
+    }
+    .sweep-open:hover:not(:disabled) { border-color: var(--ink); background: var(--ink); color: var(--paper); }
+    .sweep-open:disabled { opacity: 0.35; cursor: default; }
+
+    /* Projects share the existing compact controls and paper/ink palette. */
+    .project-picker { display: flex; align-items: center; gap: 9px; min-width: 0; }
+    .project-picker label { font-size: 0.82rem; color: var(--muted); }
+    .project-picker select, .project-input, .project-move {
+      font: 0.85rem var(--sans); color: var(--ink); background: var(--paper);
+      border: 1px solid var(--border); border-radius: var(--r); padding: 9px; min-width: 0;
+    }
+    .project-picker select { max-width: 230px; flex: 1; }
+    .header-actions { gap: 16px; }
+    .mode-project { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--border); }
+    .project-hint { font-size: 0.78rem; color: var(--muted); line-height: 1.5; margin-top: 8px; }
+    #projectDialog { margin: auto; padding: 0; width: min(560px, calc(100% - 32px)); max-height: 85vh;
+      color: var(--ink); background: var(--paper); border: 1px solid var(--border); border-radius: var(--r);
+      box-shadow: 0 24px 60px -12px rgba(19,18,16,0.4); }
+    #projectDialog::backdrop { background: rgba(19,18,16,0.6); }
+    #projectDialog .tut-skip { color: var(--paper); font-size: 0.75rem; padding: 6px; }
+    #projectDialog .ledger-tool-btn { font-size: 0.75rem; }
+    .project-content { padding: 20px; }
+    #projectForm { display: flex; align-items: end; flex-wrap: wrap; gap: 8px; }
+    .project-name-field { display: flex; flex-direction: column; gap: 7px; flex: 1; min-width: 160px; font-size: 0.82rem; }
+    .project-row { padding: 14px 0; border-bottom: 1px solid var(--border); }
+    .project-row-title { overflow-wrap: anywhere; font-size: 0.9rem; }
+    .project-row-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 9px; }
+    .project-row-actions input, .project-row-actions select { width: 100%; }
+    .project-move { font-size: 0.75rem; max-width: 200px; }
+    #projectMessage { min-height: 1.5em; margin-top: 12px; }
+    #ledgerManageProjects, label[for="ledgerProject"] { font-size: 0.75rem; letter-spacing: normal; text-transform: none; }
+    .project-export-note { font-size: 0.75rem; color: var(--muted); line-height: 1.5; }
+    @media (max-width: 800px) {
+      header { flex-wrap: wrap; gap: 0; padding-bottom: 10px; }
+      .header-actions { width: 100%; justify-content: space-between; }
+      .header-actions .project-picker { flex: 1; }
+      .project-picker select { max-width: 100%; width: 150px; }
+      #modeCard { max-height: 92vh; overflow-y: auto; }
+    }
+
+    /* ── Search Ledger ── */
+    #ledgerBackdrop {
+      display: none; position: fixed; inset: 0; background: rgba(19,18,16,0.6); z-index: 550;
+      align-items: center; justify-content: center; padding: 20px;
+    }
+    #ledgerBackdrop.visible { display: flex; }
+    #ledgerCard {
+      background: var(--card-bg); border: 1px solid var(--border); box-shadow: 0 24px 60px -12px rgba(19,18,16,0.4);
+      width: 100%; max-width: 820px; display: flex; flex-direction: column; max-height: 92vh; overflow: hidden;
+      border-radius: var(--r);
+    }
+    #mapBackdrop {
+      display: none; position: fixed; inset: 0; background: rgba(19,18,16,0.6); z-index: 560;
+      align-items: center; justify-content: center; padding: 20px;
+    }
+    #mapBackdrop.visible { display: flex; }
+    #mapCard {
+      background: var(--card-bg); border: 1px solid var(--border); box-shadow: 0 24px 60px -12px rgba(19,18,16,0.4);
+      width: 100%; max-width: 460px; display: flex; flex-direction: column; max-height: 90vh; overflow: hidden;
+      border-radius: var(--r);
+    }
+    .ledger-body { padding: 20px 22px; flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 14px; }
+    .ledger-intro { font-size: 0.82rem; line-height: 1.55; color: var(--muted); }
+    .ledger-toolbar { display: flex; align-items: end; gap: 8px; flex-wrap: wrap; }
+    .ledger-field { display: flex; flex-direction: column; gap: 5px; margin-right: auto; }
+    .ledger-field label { font-family: var(--mono); font-size: 0.58rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+    .ledger-field select, .ledger-note-input {
+      font-family: var(--sans); font-size: 0.78rem; color: var(--ink); background: var(--paper);
+      border: 1px solid var(--border); padding: 7px 9px; border-radius: var(--r);
+    }
+    .ledger-tool-btn {
+      font-family: var(--mono); font-size: 0.64rem; border: 1px solid var(--border); background: none;
+      color: var(--ink); padding: 7px 10px; cursor: pointer; border-radius: var(--r); transition: all 0.12s;
+    }
+    .ledger-tool-btn:hover:not(:disabled) { border-color: var(--ink); background: var(--hover-bg); }
+    .ledger-tool-btn:disabled { opacity: 0.35; cursor: default; }
+    .ledger-status {
+      min-height: 34px; padding: 8px 11px; border: 1px solid var(--border); background: var(--hover-bg);
+      font-family: var(--mono); font-size: 0.66rem; line-height: 1.45; color: var(--muted); border-radius: var(--r);
+    }
+    .ledger-status.good { color: var(--ink); border-color: var(--ink); }
+    .ledger-status.bad { color: var(--alert); border-color: var(--alert); background: var(--alert-bg); }
+    .ledger-list { flex: 1; min-height: 180px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--r); background: var(--paper); }
+    .ledger-empty { padding: 46px 22px; text-align: center; color: var(--muted); font-size: 0.84rem; line-height: 1.6; }
+    .ledger-entry { padding: 13px 14px; border-bottom: 1px solid var(--border); }
+    .ledger-entry:last-child { border-bottom: none; }
+    .ledger-entry-head { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+    .ledger-event {
+      font-family: var(--mono); font-size: 0.56rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em;
+      border: 1px solid var(--ink); padding: 2px 5px; border-radius: 2px;
+    }
+    .ledger-event.saved { background: var(--paper); }
+    .ledger-event.performed { background: var(--ink); color: var(--paper); }
+    .ledger-event.system { border-style: dashed; color: var(--muted); border-color: var(--muted); }
+    .ledger-when { font-family: var(--mono); font-size: 0.64rem; color: var(--muted); }
+    .ledger-seal { margin-left: auto; font-family: var(--mono); font-size: 0.58rem; color: var(--muted); }
+    .ledger-query { font-family: var(--mono); font-size: 0.72rem; line-height: 1.55; overflow-wrap: anywhere; color: var(--ink); }
+    .ledger-meta { margin-top: 6px; font-size: 0.7rem; color: var(--muted); line-height: 1.45; }
+    .ledger-note { margin-top: 7px; font-size: 0.75rem; color: var(--ink); font-style: italic; }
+    .ledger-entry-actions { display: flex; gap: 6px; margin-top: 9px; flex-wrap: wrap; }
+    .ledger-note-editor { display: flex; gap: 6px; margin-top: 9px; }
+    .ledger-note-editor .ledger-note-input { flex: 1; min-width: 120px; }
+    .ledger-footer-note { flex: 1; font-family: var(--mono); font-size: 0.6rem; line-height: 1.4; color: var(--muted); }
+    .ledger-danger { color: var(--alert); }
+    .ledger-danger:hover:not(:disabled) { border-color: var(--alert); background: var(--alert-bg); }
+
+    .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+    *:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+    @media (max-width: 700px) {
+      #builder { padding: 16px 18px 100px; }
+      #simpleMode { padding: 56px 18px 72px; }
+      .simple-title { max-width: 14ch; }
+      .simple-form { flex-direction: column; }
+      .simple-search-btn { width: 100%; }
+      .mode-body { padding: 24px 20px; }
+      .mode-options { grid-template-columns: 1fr; }
+      .tut-body { padding: 20px 18px 16px; }
+      .tut-heading { font-size: 1.1rem; }
+      header { padding: 0 18px; }
+      .masthead { font-size: 1.15rem; }
+      .ledger-open-label { display: none; }
+      .ledger-toolbar { align-items: stretch; }
+      .ledger-field { width: 100%; margin-right: 0; }
+      .ledger-field select { width: 100%; }
+      .ledger-body { padding: 16px; }
+    }
+    @media (prefers-reduced-motion: reduce) { *{ transition: none !important; animation: none !important; } }
+
+    /* ── Pipeline ── */
+    :root {
+      --ink: #1a1d1b; --muted: #5e6862; --paper: #edefea; --card-bg: #fafbf8; --hover-bg: #e4e8e2; --chip-bg: #dfe8e1; --border: #d3d8d1;
+      --alert: #b8402a; --alert-bg: #f7e3dd;
+      --display: "Archivo", system-ui, sans-serif; --serif: var(--display);
+      --sans: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+      --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+    }
+    /* In a team project Pipeline's own switcher picks the project. */
+    body.pipeline-team .project-picker, body.pipeline-team .mode-project, body.pipeline-team #ledgerManageProjects { display: none; }
+    .pipeline-project { font-size: 0.82rem; color: var(--muted); align-self: center; }
+  </style>
+</head>
+
+<body class="mode-choice">
+
+  <div class="vault-overlay" id="vaultOverlay"></div>
+
+  <!-- ═══ START MODE ═══ -->
+  <div id="modeBackdrop" class="visible">
+    <div id="modeCard" role="dialog" aria-modal="true" aria-labelledby="modeHeading" aria-describedby="modeDescription">
+      <div class="tut-header"><span class="tut-header-title">Query Forge</span></div>
+      <div class="mode-body">
+        <h1 class="mode-title" id="modeHeading">How would you like to search?</h1>
+        <p class="mode-copy" id="modeDescription">Choose a focused search surface or open the complete query-building workspace.</p>
+        <div class="mode-project"><div class="project-picker"><label for="startProject">Project</label><select id="startProject" disabled><option value="general">General</option></select></div><p class="project-hint">Saved queries and searches go into the selected project.</p></div>
+        <div class="mode-options">
+          <button class="mode-option" id="chooseSimple" type="button">
+            <span class="mode-option-title">Simple mode</span>
+            <span class="mode-option-copy">Write a search, run it, sweep a date range, and keep a local search ledger.</span>
+          </button>
+          <button class="mode-option" id="chooseAdvanced" type="button">
+            <span class="mode-option-title">Advanced mode</span>
+            <span class="mode-option-copy">Use sources, operators, site lists, query previews, and the full Query Forge workflow.</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ TUTORIAL MODAL ═══ -->
+  <div id="tutorialBackdrop">
+    <div id="tutorialCard" role="dialog" aria-modal="true" aria-labelledby="tutHeading">
+      <div class="tut-header">
+        <span class="tut-header-title">How Investigations Lab's Query Forge works</span>
+        <button class="tut-skip" id="tutSkip">skip tour ✕</button>
+      </div>
+      <div class="tut-body" id="tutBody"></div>
+      <div class="tut-footer">
+        <div class="tut-dots" id="tutDots"></div>
+        <button class="tut-btn-prev" id="tutPrev">← Back</button>
+        <button class="tut-btn-next" id="tutNext">Next →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SYSTEMATIC SEARCH SWEEP MODAL ═══ -->
+  <div id="sweepBackdrop">
+    <div id="sweepCard" role="dialog" aria-modal="true" aria-labelledby="sweepHeading">
+      <div class="tut-header">
+        <span class="tut-header-title" id="sweepHeading">Systematic Search Sweep</span>
+        <button class="tut-skip" id="sweepClose">close ✕</button>
+      </div>
+      <div class="tut-body">
+        <p class="tut-text" style="font-size:0.85rem; margin-bottom:18px;">
+          One big query lets the engine collapse years of activity into a single ranked list dominated by the
+          recent and the loud. A <b>systematic search sweep</b> slices your date range into windows small enough
+          to comb through to the bottom — so finishing every window is a defensible claim of coverage, and an
+          empty sweep is evidence of absence, not of a lazy afternoon.
+        </p>
+        <div class="sweep-inputs">
+          <div class="sweep-field">
+            <label for="sweepStart">From</label>
+            <input type="date" id="sweepStart">
+          </div>
+          <div class="sweep-field">
+            <label for="sweepEnd">Until</label>
+            <input type="date" id="sweepEnd">
+          </div>
+          <div class="sweep-field">
+            <label for="sweepSize">Window size</label>
+            <span class="sweep-size-row">
+              <input type="number" id="sweepSize" min="1" max="99" value="1">
+              <select id="sweepUnit">
+                <option value="days">days</option>
+                <option value="weeks" selected>weeks</option>
+                <option value="months">months</option>
+              </select>
+            </span>
+          </div>
+        </div>
+        <div class="sweep-summary" id="sweepSummary"></div>
+        <div class="sweep-list" id="sweepList"></div>
+        <p class="tut-tip" id="sweepNote"></p>
+      </div>
+      <div class="tut-footer">
+        <button class="tut-btn-prev" id="sweepReset">Reset progress</button>
+        <button class="tut-btn-next" id="sweepNext">Open next window ↗</button>
+      </div>
+    </div>
+  </div>
+
+  <dialog id="projectDialog" aria-labelledby="projectHeading">
+    <div class="tut-header"><span class="tut-header-title" id="projectHeading">Manage projects</span><button class="tut-skip" id="projectClose" type="button">Close</button></div>
+    <div class="project-content">
+      <form id="projectForm">
+        <label class="project-name-field" for="projectName">New project name<input class="project-input" id="projectName" maxlength="80" required autocomplete="off"></label>
+        <button class="ledger-tool-btn" type="submit">Create project</button>
+      </form>
+      <p id="projectMessage" class="project-hint" role="status"></p>
+      <div id="projectList"></div>
+    </div>
+  </dialog>
+
+  <!-- ═══ LOCAL SEARCH LEDGER ═══ -->
+  <div id="ledgerBackdrop">
+    <div id="ledgerCard" role="dialog" aria-modal="true" aria-labelledby="ledgerHeading">
+      <div class="tut-header">
+        <span class="tut-header-title" id="ledgerHeading">Search Ledger</span>
+        <button class="tut-skip" id="ledgerClose">close ✕</button>
+      </div>
+      <div class="ledger-body">
+        <p class="ledger-intro">
+          A local record of queries you save or perform. In a team project each one is also added to the
+          <b>Queries</b> tab of the team sheet; no result pages are stored anywhere. Entries are hash-chained so accidental edits, gaps, and reordering can be detected.
+        </p>
+        <div class="ledger-toolbar">
+          <div class="ledger-field"><label for="ledgerProject">View project</label><select id="ledgerProject"><option value="general">General</option></select></div>
+          <button class="ledger-tool-btn" id="ledgerManageProjects">Manage projects…</button>
+        </div>
+        <p class="project-export-note" id="ledgerScope">Exports contain this project only. Verify chain checks the complete ledger.</p>
+        <div class="ledger-toolbar">
+          <div class="ledger-field">
+            <label for="ledgerRetention">Automatic retention · all projects</label>
+            <select id="ledgerRetention">
+              <option value="forever">Keep until I clear it</option>
+              <option value="365">Keep one year</option>
+              <option value="90">Keep 90 days</option>
+              <option value="30">Keep 30 days</option>
+            </select>
+          </div>
+          <button class="ledger-tool-btn" id="ledgerVerify">Verify chain</button>
+          <button class="ledger-tool-btn" id="ledgerExportJsonl">Export JSONL</button>
+          <button class="ledger-tool-btn" id="ledgerExportCsv">Export CSV</button>
+        </div>
+        <div class="ledger-status" id="ledgerStatus" role="status">Opening the local ledger…</div>
+        <div class="ledger-list" id="ledgerList"></div>
+      </div>
+      <div class="tut-footer">
+        <span class="ledger-footer-note">Clearing browser site data also clears this ledger. Export it when you need a durable copy.</span>
+        <button class="ledger-tool-btn ledger-danger" id="ledgerClear">Clear ledger</button>
+        <button class="tut-btn-next" id="ledgerDone">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ CSV COLUMN MAPPING ═══ -->
+  <div id="mapBackdrop">
+    <div id="mapCard" role="dialog" aria-modal="true" aria-labelledby="mapHeading">
+      <div class="tut-header">
+        <span class="tut-header-title" id="mapHeading">Which column is which?</span>
+        <button class="tut-skip" id="mapCancel">cancel ✕</button>
+      </div>
+      <div class="ledger-body">
+        <p class="ledger-intro" id="mapIntro"></p>
+        <div class="ledger-toolbar">
+          <div class="ledger-field">
+            <label for="mapDomain">Domain / URL column</label>
+            <select id="mapDomain"></select>
+          </div>
+          <div class="ledger-field">
+            <label for="mapName">Name column (optional)</label>
+            <select id="mapName"></select>
+          </div>
+        </div>
+        <div class="notice error" id="mapErr" hidden></div>
+      </div>
+      <div class="tut-footer">
+        <span class="ledger-footer-note">Everything else in the file is ignored.</span>
+        <button class="tut-btn-next" id="mapConfirm">Use these columns</button>
+      </div>
+    </div>
+  </div>
+
+  <header inert>
+    <div class="header-left">
+      <div class="header-seal"></div>
+      <div class="masthead">Query <span>Forge</span></div>
+    </div>
+    <div class="header-actions">
+      <span class="pipeline-project" id="pipelineProject"></span>
+      <div class="project-picker"><label for="activeProject">Project</label><select id="activeProject" disabled><option value="general">General</option></select></div>
+      <button class="ledger-open-btn" id="ledgerOpen" aria-haspopup="dialog">
+        <span class="ledger-open-label">Search ledger</span><span class="ledger-count" id="ledgerCount">0</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ═══ SIMPLE SEARCH ═══ -->
+  <main id="simpleMode" hidden>
+    <section class="simple-shell" aria-label="Simple search">
+      <p class="simple-copy">Type a query and search Google directly. Use a sweep when you need to cover a date range; every search is recorded in your local ledger<span class="team-only" hidden> and in the team sheet</span>.</p>
+      <form class="simple-form" id="simpleForm">
+        <label class="sr" for="simpleQuery">Search query</label>
+        <input class="simple-input" id="simpleQuery" type="search" placeholder="What are you looking for?" autocomplete="off" spellcheck="false">
+        <button class="btn-search simple-search-btn" type="submit">Search Google ↗</button>
+      </form>
+      <div class="simple-tools">
+        <button class="btn-sweep" id="simpleSweep" type="button">Systematic sweep</button>
+        <span class="simple-note">Searches open in Google’s Web tab and are saved locally<span class="team-only" hidden> and to the team sheet</span>.</span>
+      </div>
+    </section>
+  </main>
+
+  <div id="app" inert>
+    <section id="builder">
+
+      <!-- 1. Sources -->
+      <div class="step-section" id="step0">
+      <div class="step-label">
+        <span class="step-num">1</span> Sources <span class="step-opt">(optional)</span>
+        <span class="step-status" hidden></span>
+      </div>
+      <div class="step-hint">Load a list of sites to search inside — your own, or fetched from a public source database. <b>Skip</b> to search the whole web.</div>
+
+      <div class="doors">
+        <button class="door" id="doorUrl" aria-expanded="false" aria-controls="panelUrl">
+          <span class="door-t">Load from a URL</span>
+          <span class="door-s">Your own list, as published CSV</span>
+        </button>
+        <button class="door" id="doorDb" aria-expanded="false" aria-controls="panelDb">
+          <span class="door-t">Browse source databases</span>
+          <span class="door-s">Newspapers, TV, universities, agencies…</span>
+        </button>
+        <button class="door" id="doorPaste" aria-expanded="false" aria-controls="panelPaste">
+          <span class="door-t">Paste a CSV</span>
+          <span class="door-s">Copy the text of your file and import it</span>
+        </button>
+      </div>
+
+      <!-- CSV panel -->
+      <div class="panel" id="panelUrl" hidden>
+        <div class="field">
+          <label for="csvUrl">Google Sheets published-CSV link</label>
+          <div class="row">
+            <input class="grow" type="url" id="csvUrl" placeholder="https://docs.google.com/…/pub?output=csv" autocomplete="off" spellcheck="false">
+            <button class="btn-primary" id="csvLoad">Load list</button>
+          </div>
+        </div>
+        <p class="step-hint" style="margin:0;font-size:0.9rem">
+          Needs a column called <code>domain</code>, <code>url</code> or <code>site</code>.
+          A <code>name</code> column is used as the label if present.
+        </p>
+        <div class="notice error" id="csvErr" hidden></div>
+      </div>
+
+      <!-- Paste panel -->
+      <div class="panel" id="panelPaste" hidden>
+        <div class="field">
+          <label for="csvPaste">Paste the text of your CSV</label>
+          <p class="step-hint" style="margin:0 0 8px;font-size:0.9rem">
+            The format should be: a column called <code>domain</code>, <code>url</code> or <code>site</code> &mdash;
+            that is the one required column. A <code>name</code> column can be used as the label if present.
+            Any other columns are ignored.
+          </p>
+          <textarea class="paste-box" id="csvPaste" spellcheck="false"
+            placeholder="domain,name&#10;milenio.com,Milenio&#10;eluniversal.com.mx,El Universal"></textarea>
+        </div>
+        <div class="row" style="margin-top:12px">
+          <button class="btn-primary" id="pasteImport">Import list</button>
+          <span class="vault-count" id="pasteStatus"></span>
+        </div>
+        <div class="notice error" id="pasteErr" hidden></div>
+      </div>
+
+      <!-- Database panel -->
+      <div class="panel" id="panelDb" hidden>
+        <div class="trio">
+          <div class="field">
+            <label for="dbPick">Database</label>
+            <select id="dbPick"></select>
+          </div>
+          <div class="field">
+            <label for="typePick">What kind of source</label>
+            <select id="typePick"></select>
+          </div>
+          <div class="field">
+            <label for="countryPick">Country</label>
+            <div class="combo" id="countryCombo">
+              <input type="text" id="countryPick" autocomplete="off" spellcheck="false"
+                     role="combobox" aria-expanded="false" aria-autocomplete="list"
+                     aria-controls="countryList" placeholder="Type to search…">
+              <button type="button" id="countryClear" class="combo-clear"
+                      aria-label="Clear country" hidden>&times;</button>
+              <ul class="combo-list" id="countryList" role="listbox"
+                  aria-label="Countries" hidden></ul>
+            </div>
+            <p class="fieldhint" id="countryHint" aria-live="polite"></p>
+          </div>
+        </div>
+
+        <div class="field" id="regionField">
+          <label for="regionPick">Region, state or province</label>
+          <select id="regionPick"></select>
+        </div>
+
+        <div class="notice" id="dbNote"></div>
+
+        <p class="fetch-warning">Fetching can take a few seconds — larger databases (official registries) may take longer.</p>
+
+        <div class="row" style="margin-top:12px">
+          <button class="btn-primary" id="dbFetch">Fetch sources</button>
+          <span class="vault-count" id="dbStatus"></span>
+        </div>
+        <div class="progress-track" id="dbProgressTrack" hidden><div class="progress-fill" id="dbProgressFill"></div></div>
+        <div class="notice error" id="dbErr" hidden></div>
+      </div>
+
+      <!-- Vault bar -->
+      <div class="vault-bar">
+        <button class="btn-ghost" id="btnVault" aria-expanded="false">▶ Open Vault</button>
+        <span class="vault-count" id="vaultCount">0 sources · 0 selected</span>
+        <button class="btn-ghost" id="vaultClear" style="margin-left:auto">Empty vault</button>
+      </div>
+
+      <div class="notice" id="coverage" hidden></div>
+      </div><!-- /#step0 -->
+
+      <!-- 2. What are you looking for? (terms + operators as one form) -->
+      <div class="section-block step-section" id="step1">
+        <div class="step-label">
+          <span class="step-num">2</span> What are you looking for?
+          <span class="step-opt">(answer any or all)</span>
+          <span class="step-status" hidden></span>
+        </div>
+        <div class="step-hint">Each answer becomes a piece of Google syntax — shown under the field, and assembled live in the preview below. A single word is a valid search.</div>
+        <div class="examples-row">
+          <span class="examples-label">try:</span>
+          <button class="example-btn" data-example="recent">recent deportation coverage</button>
+          <button class="example-btn" data-example="pdf">official PDF reports</button>
+          <button class="example-btn" data-example="headline">phrase in headlines</button>
+        </div>
+
+        <div class="q-fields">
+          <div class="field q-field">
+            <label for="termsAnd">Terms that are required to show up together</label>
+            <input type="text" id="termsAnd" placeholder="climate, migration" autocomplete="off" spellcheck="false">
+            <p class="q-hint">Separate by commas — every one of them must appear on the page<span class="q-op">AND</span></p>
+          </div>
+          <div class="field q-field">
+            <label for="termsOr">Terms that are interesting but don't have to appear together</label>
+            <input type="text" id="termsOr" placeholder="deportation, expulsion, removal" autocomplete="off" spellcheck="false">
+            <p class="q-hint">Separate by commas — at least one of them has to appear<span class="q-op">OR</span></p>
+          </div>
+          <div class="field q-field">
+            <label for="phrase">An exact phrase, word for word</label>
+            <input type="text" id="phrase" placeholder="forced returns" autocomplete="off" spellcheck="false">
+            <p class="q-hint">Matched in this exact order<span class="q-op">"…"</span></p>
+          </div>
+          <div class="field q-field">
+            <label for="dateFrom">Are you interested in a particular period?</label>
+            <div class="q-dates">
+              <span class="q-date-tag">from</span>
+              <input type="date" id="dateFrom" aria-label="Period start">
+              <span class="q-date-tag">until</span>
+              <input type="date" id="dateUntil" aria-label="Period end">
+            </div>
+            <p class="q-hint">Leave either side empty for an open range<span class="q-op">after:</span><span class="q-op">before:</span></p>
+          </div>
+        </div>
+
+        <div class="op-filters-label">More ways to narrow it down — optional</div>
+        <div class="op-buttons" id="opButtons"></div>
+        <div id="opPanel">
+          <span class="op-panel-label" id="opPanelLabel"></span>
+          <input type="text" id="opPanelInput" autocomplete="off" spellcheck="false">
+          <select id="opPanelSelect"></select>
+          <button class="op-add-btn" id="opAddBtn">Add ↵</button>
+          <button class="op-cancel-btn" id="opCancelBtn">cancel</button>
+        </div>
+        <div id="opChips"></div>
+      </div>
+
+      <!-- 3. Extra sites -->
+      <div class="section-block step-section" id="step3">
+        <div class="step-label space-between">
+          <span style="display:flex;align-items:center;gap:8px;">
+            <span class="step-num">3</span> Extra sites <span class="step-opt">(optional)</span>
+            <span class="step-status" hidden></span>
+          </span>
+          <span class="site-count-note" id="siteCountNote"></span>
+        </div>
+        <div class="step-hint">Add one-off sites by hand. They join whatever's selected in the Vault.</div>
+        <div class="site-chips-row" id="sitesZone"></div>
+        <div class="domain-row">
+          <input type="text" id="domainInput" placeholder="e.g. latimes.com" autocomplete="off" spellcheck="false">
+          <button class="domain-add-btn" id="domainAddBtn">+ Add</button>
+        </div>
+      </div>
+
+      <hr class="section-divider">
+
+      <!-- Preview -->
+      <div class="section-block">
+        <div class="preview-row">
+          <div class="preview-label">▌ Query preview</div>
+          <button class="copy-btn" id="copyBtn">copy</button>
+        </div>
+        <div id="preview"><span class="preview-empty">Type a word above — your query builds itself here.</span></div>
+        <div id="translation" class="empty">In plain English, your search will appear here.</div>
+        <div class="notice warn" id="lenWarn" hidden style="margin-top:10px"></div>
+        <div class="budget-row">
+          <div class="budget-track">
+            <div class="budget-fill" id="budgetFill"></div>
+          </div>
+          <div class="budget-label" id="budgetLabel">0% · 0 sites</div>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="action-row">
+        <button class="btn-clear" id="btnClear">Clear all</button>
+        <button class="btn-save-ledger" id="btnSaveLedger">Save query</button>
+        <span class="batchnav" id="batchNav" hidden>
+          <button id="bPrev">←</button>
+          <span id="bLabel">1 / 1</span>
+          <button id="bNext">→</button>
+        </span>
+        <div class="search-wrap">
+          <div class="search-btns">
+            <button class="btn-sweep" id="btnSweep">Systematic sweep</button>
+            <button class="btn-search" id="btnSearch">Search Google ↗</button>
+          </div>
+          <span class="search-note" id="searchNote">opens Web tab in Verbatim mode</span>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ═══ VAULT ═══ -->
+    <aside id="vault">
+      <div class="vault-header">
+        <div class="vault-title-row">
+          <span class="vault-title">Source Vault</span>
+          <button class="vault-close-btn" id="vaultCloseBtn">✕</button>
+        </div>
+        <div class="vault-tools">
+          <button class="vault-tool-btn" id="vaultAll">Select all</button>
+          <button class="vault-tool-btn" id="vaultNone">Select none</button>
+          <span class="vault-tool-count" id="vaultToolCount"></span>
+        </div>
+        <input type="text" id="vaultFilter" placeholder="Filter sources…" autocomplete="off">
+      </div>
+      <div class="vault-body" id="vaultBody">
+        <div class="vault-status">Nothing loaded yet.<br>Use a database or your own list on the left to fill the Vault.</div>
+      </div>
+    </aside>
+
+  </div>
+
+  <div class="sr" role="status" aria-live="polite" id="live"></div>
+
+  <script src="queryforge.js"></script>
+</body>
+</html>

@@ -252,6 +252,19 @@ try {
   await app.waitForTimeout(800)
   await shot('team-searches')
 
+  // Query Forge: a saved query stays in its local ledger and is appended to the sheet's Queries tab.
+  await app.getByRole('button', { name: /Queries/ }).first().click()
+  const forge = app.frameLocator('iframe[title="Query Forge"]')
+  await forge.getByRole('button', { name: /Advanced mode/ }).click()
+  await forge.getByRole('button', { name: /skip tour/ }).click().catch(() => {})
+  await forge.locator('#termsAnd').fill('smoke, forge')
+  await until(async () => (await forge.locator('#pipelineProject').innerText()).includes('Project:'), 4000)
+  await forge.locator('#btnSaveLedger').click()
+  const queries = await until(async () => { const rows = (await sheet()).Queries; return rows?.length === 2 && rows }, 8000)
+  check('Queries: a saved query reaches the sheet\'s Queries tab with a header row', !!queries && queries[0][3] === 'Query' && queries[1][1] === 'Smoke Tester' && queries[1][2] === 'saved' && /smoke/.test(queries[1][3]), JSON.stringify(queries || (await sheet()).Queries).slice(0, 300))
+  check('  and is kept in the local ledger under the team project', (await forge.locator('#ledgerCount').innerText()).trim() === '1')
+  await shot('queries')
+
   // A second project (its own sheet). A save made while A is active must land in A even if the user switches before delivery.
   const B = { id: 'proj-b', label: 'Project B', url: BRIDGE2, token: 'smoke-token', name: 'Smoke Tester' }
   await sw.evaluate(b => chrome.storage.local.get('pipelineTeams').then(s => chrome.storage.local.set({ pipelineTeams: [...s.pipelineTeams, b] })), B)

@@ -31,7 +31,7 @@
     const result = await api.switchTeam(id)
     if (!result.ok) return notify('error', result.error)
     await syncTeams()
-    if (!['library', 'explore', 'archive', 'team-searches'].includes($currentView)) setView('library')
+    if (!['library', 'explore', 'archive', 'queries', 'team-searches'].includes($currentView)) setView('library')
   }
 
   let restoreInput
@@ -117,6 +117,7 @@
         <button class="nav-item" class:active={$currentView === 'library'} data-tour="nav-library" on:click={() => setView('library')}><span class="nav-icon">📚</span>Library</button>
         <button class="nav-item" class:active={$currentView === 'explore'} on:click={() => setView('explore')}><span class="nav-icon">🧭</span>Explore</button>
         <button class="nav-item" class:active={$currentView === 'archive'} on:click={() => setView('archive')}><span class="nav-icon">🗄</span>Archive</button>
+        <button class="nav-item" class:active={$currentView === 'queries'} on:click={() => setView('queries')}><span class="nav-icon">⌕</span>Queries</button>
         <button class="nav-item" class:active={$currentView === 'team-searches'} on:click={() => setView('team-searches')}><span class="nav-icon">🔎</span>Team searches</button>
       </nav>
     {/if}

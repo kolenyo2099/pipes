@@ -50,6 +50,21 @@ describe('outbox', () => {
     expect((await send({ type: 'pipeline:status' })).pending).toBe(0)
   })
 
+  it('appends queries to the Queries tab, with headers only when the tab is new', async () => {
+    const query = n => ({ kind: 'query', key: 'q' + n, headers: ['Query'], row: ['q' + n] })
+    let sheets = ['Archive']
+    fetch = vi.fn(async (_url, init) => reply(JSON.stringify(JSON.parse(init.body).action === 'getSheets' ? { ok: true, sheets } : { ok: true })))
+    const send = load()
+    await send({ type: 'pipeline:save', item: query(1) })
+    await settle()
+    expect(JSON.parse(fetch.mock.calls[1][1].body)).toMatchObject({ token: 'tok', tab: 'Queries', rows: [['Query'], ['q1']] })
+    sheets = ['Archive', 'Queries']
+    await send({ type: 'pipeline:save', item: query(2) })
+    await settle()
+    expect(JSON.parse(fetch.mock.calls[3][1].body).rows).toEqual([['q2']])
+    expect((await send({ type: 'pipeline:status' })).pending).toBe(0)
+  })
+
   it('reports per-item failures without retrying them', async () => {
     fetch = vi.fn(async () => reply(JSON.stringify({ ok: true, results: [{ ok: true }, { ok: false, error: 'URL is required' }] })))
     const send = load()
