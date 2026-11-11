@@ -53,7 +53,7 @@ No dependencies. Runs `test/bridge.test.js` against a fake SpreadsheetApp in `no
 
 - **Library** (home): everything the team saved, with who saved it and whether it is archived and processed.
 - **Save**: buttons on Google, X, YouTube and Facebook, right-click save for pages, links, PDFs and images. Page text is sent with the save. One outbox delivers everything and retries.
-- **Archive**: HRC Archiver's capture engine. Screenshot, PDF, MHTML, HAR, DOM, SHA-256 hashes and an RFC 3161 timestamp go to `Downloads/Pipeline/<id>/` on the capturing machine; the sheet gets the hashes. Rows are locked while a teammate captures them.
+- **Archive**: HRC Archiver's capture engine. Screenshot, PDF, MHTML, HAR, DOM, SHA-256 hashes and an RFC 3161 timestamp go to `Downloads/Pipeline/<project>/` or a folder you pick in the Archive view (a recorded video is one MP4 with its audio); formerly `Downloads/Pipeline/<id>/` on the capturing machine; the sheet gets the hashes. Rows are locked while a teammate captures them.
 - **Explore**: the entity explorer published by the research pipeline, with the time of the last run.
 - **Monitor (Canary)**: optional news and social monitoring. Inboxes stay in each browser; a monitoring setup can be shared with the team under Team searches.
 
@@ -61,7 +61,7 @@ No dependencies. Runs `test/bridge.test.js` against a fake SpreadsheetApp in `no
 cd extension && npm install && npm run build
 ```
 
-Load `extension/dist` with "Load unpacked" in `chrome://extensions`, open the extension and paste the join code and your name. Tests: `npx vitest run`. Contracts: `docs/product-contract.md`, `docs/extension-save-contract.md`.
+Load `extension/dist` with "Load unpacked" in `chrome://extensions`, open the extension and join a project with the join code, a project name and your name. You can join several projects (one sheet each) and switch between them in the sidebar; each has its own Library, Explore and Archive. Tests: `npx vitest run`. Contracts: `docs/product-contract.md`, `docs/extension-save-contract.md`.
 
 ## Research pipeline
 

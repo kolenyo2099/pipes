@@ -72,7 +72,7 @@
     } catch { /* restricted page: the outbox badge still shows the queue */ }
   }
 
-  // `manual`: also remember this tab for the Archive view's "Capture this tab now" (the engine runs in the app page,
+  // `manual`: also remember this tab for the Archive view's "Capture that tab now" (the engine runs in the app page,
   // which has the DOM APIs, blob URLs and downloads it needs; a service worker cannot do the capture itself).
   async function save({ capture, tabId, manual }) {
     const reply = await pipelineEnqueue({ kind: 'capture', capture });
@@ -83,7 +83,7 @@
     await toast(
       tabId,
       reply?.ok
-        ? (manual ? `✅ Saved. Open Pipeline → Archive and press "Capture this tab now": "${(capture.title || capture.url).slice(0, 40)}"`
+        ? (manual ? `✅ Saved. Open Pipeline → Archive and press "Capture that tab now": "${(capture.title || capture.url).slice(0, 40)}"`
                   : `✅ Saved to team queue: "${(capture.title || capture.url).slice(0, 60)}"`)
         : `❌ ${reply?.error || 'Save failed.'}`,
       !!reply?.ok

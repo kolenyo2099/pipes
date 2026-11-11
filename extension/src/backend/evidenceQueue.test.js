@@ -23,6 +23,12 @@ function deps({ lockCount = 1, archive = async () => GOOD, fail = {} } = {}) {
 const actions = d => d.calls.map(c => c[0])
 
 describe('archive queue', () => {
+  it('a capture cancelled by closing its tab writes nothing to the sheet and releases the lock', async () => {
+    const d = deps({ archive: async () => ({ status: 'cancelled', error: 'closed' }) })
+    expect((await archiveOne(ITEM, d)).status).toBe('cancelled')
+    expect(actions(d)).toEqual(['lock', 'unlock'])
+  })
+
   it('locks, captures, writes the evidence, puts the text, then unlocks', async () => {
     const d = deps()
     const result = await archiveOne(ITEM, d)

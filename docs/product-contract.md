@@ -1,6 +1,6 @@
 # Product contract (Phase 3: one product, not Canary plus a queue)
 
-The extension is "Pipeline". Home is the team Library. Canary is one section (Monitor). Everything coordinates through the team sheet via `bridge/Code.gs`.
+The extension is "Pipeline". Home is the team Library. Canary is one section (Monitor). Everything coordinates through a team sheet via `bridge/Code.gs`. A person can join several team projects (one sheet, one join code each); each has its own Library, Explore and Archive, and one is active at a time. The sidebar has two groups: Collaborate (the active project's views, shared through its sheet) and Monitor (Canary monitors and inboxes, local to this browser and not tied to any project). A save goes to the project that was active when it was made.
 
 ## Shared client (exists): `extension/src/backend/bridge.js`
 
@@ -28,7 +28,7 @@ File ownership: **shell** = `src/App.svelte`, `src/components/Sidebar.svelte`, `
 
 ## Evidence (archive owner)
 
-Evidence files stay on the capturing machine under `Downloads/Pipeline/<item id>/`; the sheet gets `evidence_hash` (SHA-256 of the manifest or main file), `evidence_files` (names + hashes), `captured_by` (team name), `captured_at`, and `status` (`done` / `needs_review` / `failed`). Rows are locked (`lock` with `locked_by` = a per-install id) while being captured.
+Evidence files stay on the capturing machine under `Downloads/Pipeline/<project>/<item id>/` (or `<a folder the user picked in Archive>/<project>/<item id>/`); the sheet gets `evidence_hash` (SHA-256 of the manifest or main file), `evidence_files` (names + hashes), `captured_by` (team name), `captured_at`, and `status` (`done` / `needs_review` / `failed`). Rows are locked (`lock` with `locked_by` = a per-install id) while being captured.
 
 ## Shared searches (searches owner)
 

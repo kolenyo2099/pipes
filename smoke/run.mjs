@@ -19,6 +19,7 @@ manifest.host_permissions.push('<all_urls>')
 fs.writeFileSync(path.join(dist, 'manifest.json'), JSON.stringify(manifest))
 const shots = process.env.SMOKE_SHOTS  // optional folder for screenshots of each view
 const PORT = 8787, BRIDGE = `http://127.0.0.1:${PORT}/`
+const PORT2 = 8788, BRIDGE2 = `http://127.0.0.1:${PORT2}/`  // a second team project: its own sheet
 const results = []
 const check = (name, ok, detail = '') => { results.push(ok); console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${detail ? ' — ' + detail : ''}`) }
 
@@ -28,10 +29,12 @@ const haveVideo = spawnSync('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i',
 const image = path.join(path.dirname(video), 't.png')
 const haveImage = spawnSync('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc=size=400x300', '-frames:v', '1', image]).status === 0
 const server = spawn('node', [path.join(here, 'fake-bridge.js'), String(PORT)], { stdio: 'inherit', env: { ...process.env, ...(haveVideo && { SMOKE_VIDEO: video }), ...(haveImage && { SMOKE_IMAGE: image }) } })
-process.on('exit', () => server.kill())
+const server2 = spawn('node', [path.join(here, 'fake-bridge.js'), String(PORT2)], { stdio: 'inherit' })
+process.on('exit', () => { server.kill(); server2.kill() })
 await sleep(500)
 const sheet = async () => (await fetch(BRIDGE + '_sheet')).json()
-const archive = async () => { const rows = (await sheet()).Archive || []; return rows.slice(1).map(r => Object.fromEntries(rows[0].map((h, i) => [h, r[i]]))) }
+const archiveOf = async base => { const rows = (await (await fetch(base + '_sheet')).json()).Archive || []; return rows.slice(1).map(r => Object.fromEntries(rows[0].map((h, i) => [h, r[i]]))) }
+const archive = () => archiveOf(BRIDGE)
 const until = async (fn, ms = 15000) => { const end = Date.now() + ms; while (Date.now() < end) { const v = await fn(); if (v) return v; await sleep(250) } return null }
 
 const context = await chromium.launchPersistentContext('', {
@@ -50,7 +53,8 @@ try {
     const q = s.pipelineOutbox || []
     return { pending: q.filter(i => !i.parked).length, parked: q.filter(i => i.parked).length, lastError: s.pipelineLastError || '' }
   })
-  const setTeam = token => sw.evaluate(t => chrome.storage.local.set({ pipelineTeam: { url: t.url, token: t.token, name: 'Smoke Tester' } }), { url: BRIDGE, token })
+  // Replaces the joined projects with one active project (what joining does in the UI).
+  const setTeam = token => sw.evaluate(t => { const team = { id: 'proj-a', label: 'Project A', url: t.url, token: t.token, name: 'Smoke Tester' }; return chrome.storage.local.set({ pipelineTeams: [team], pipelineTeam: team }) }, { url: BRIDGE, token })
 
   // Not configured: saves are refused with a clear message.
   const refused = await sw.evaluate(() => pipelineEnqueue({ kind: 'capture', capture: { url: 'https://e.test/x' } }))
@@ -66,15 +70,17 @@ try {
   // A fresh install (no Canary project yet) must still be able to join a team.
   const skip = app.getByText('Skip tour')
   if (await skip.count()) await skip.click()  // first-run tour covers the page
-  await app.getByRole('button', { name: /Team sheet/ }).click()
-  const teamCard = await until(async () => (await app.getByRole('heading', { name: 'Team' }).count()) > 0, 4000)
+  await app.getByRole('button', { name: 'Join or manage projects' }).click()
+  const teamCard = await until(async () => (await app.getByRole('heading', { name: 'Team projects' }).count()) > 0, 4000)
   check('Team card reachable on a fresh install', !!teamCard, teamCard ? '' : (await app.locator('body').innerText()).slice(0, 200).replace(/\s+/g, ' '))
   if (teamCard) {
     await app.getByLabel('Join code').fill(Buffer.from(JSON.stringify({ url: 'https://script.google.com/macros/s/x/exec', token: 't' })).toString('base64url'))
+    await app.getByLabel('Project name').fill('Smoke project')
     await app.getByLabel('Your name').fill('UI Tester')
-    await app.getByRole('button', { name: 'Save' }).click()
-    const saved = await until(() => sw.evaluate(async () => (await chrome.storage.local.get('pipelineTeam')).pipelineTeam?.name === 'UI Tester'))
-    check('  join code saves from the Team card', !!saved)
+    await app.getByRole('button', { name: 'Join', exact: true }).click()
+    const saved = await until(() => sw.evaluate(async () => { const s = await chrome.storage.local.get(['pipelineTeam', 'pipelineTeams']); return s.pipelineTeam?.name === 'UI Tester' && s.pipelineTeam.label === 'Smoke project' && s.pipelineTeams.length === 1 && s.pipelineTeams[0].id === s.pipelineTeam.id }))
+    check('  join code saves from the Team projects card', !!saved)
+    check('  the sidebar shows the joined project and its views', !!(await until(async () => (await app.getByLabel('Team project').count()) > 0 && (await app.getByRole('button', { name: /Library/ }).count()) > 0, 4000)))
   }
 
   // Google results page: per-row save and "Save all" through the content script.
@@ -230,9 +236,9 @@ try {
     // The person solves the check: the page changes in place (no reload), which a reload-based capture would lose.
     await userTab.evaluate(() => { window.__marker = 42; document.title = 'Walled article'; document.body.innerHTML = '<main><h1>Walled article</h1>' + '<p>Text behind the wall that only the person could reach.</p>'.repeat(30) + '</main>' })
     await app.bringToFront()
-    const tabCard = app.locator('.card', { hasText: 'Capture this tab now' })
+    const tabCard = app.locator('.card', { hasText: 'Capture that tab now' })
     await until(async () => (await tabCard.count()) > 0, 8000)
-    await tabCard.getByRole('button', { name: 'Capture this tab now' }).click()
+    await tabCard.getByRole('button', { name: 'Capture that tab now' }).click()
     const manual = await until(async () => { const r = await rowFor(wall); return r && r.Status !== 'pending' && r }, 120000)
     const meta = manual ? JSON.parse(manual['Result Metadata'] || '{}') : {}
     check('(d) manual capture of the open tab → done, capture_mode manual, row unlocked', !!manual && manual.Status === 'done' && meta.capture_mode === 'manual' && !manual['Locked By'] && !!manual['Evidence Hash'], manual && `${manual.Status} ${manual['Result Metadata']}`.slice(0, 200))
@@ -246,6 +252,23 @@ try {
   await app.waitForTimeout(800)
   await shot('team-searches')
 
+  // A second project (its own sheet). A save made while A is active must land in A even if the user switches before delivery.
+  const B = { id: 'proj-b', label: 'Project B', url: BRIDGE2, token: 'smoke-token', name: 'Smoke Tester' }
+  await sw.evaluate(b => chrome.storage.local.get('pipelineTeams').then(s => chrome.storage.local.set({ pipelineTeams: [...s.pipelineTeams, b] })), B)
+  await fetch(BRIDGE2, { method: 'POST', body: JSON.stringify({ token: 'smoke-token', action: 'dataBatch', sheetName: 'Archive', items: [{ capture: { url: 'https://b.test/only', title: 'Beta only item', sourceType: 'page', savedBy: 'Bea' } }] }) })
+  await fetch(BRIDGE + '_fail', { method: 'POST', body: '{"on":true}' })
+  await sw.evaluate(() => pipelineEnqueue({ kind: 'capture', capture: { url: 'https://stamp.test/1', title: 'Saved in A', sourceType: 'page' } }))
+  await app.getByLabel('Team project').selectOption('proj-b')
+  check('switching project makes B active', !!(await until(() => sw.evaluate(async () => (await chrome.storage.local.get('pipelineTeam')).pipelineTeam?.id === 'proj-b'))))
+  await app.getByRole('button', { name: /Library/ }).first().click()
+  check('Library shows project B\'s items, not A\'s', !!(await until(async () => (await app.getByText('Beta only item').count()) > 0, 8000)) && (await app.getByText('Smoke article').count()) === 0)
+  await shot('library-project-b')
+  await fetch(BRIDGE + '_fail', { method: 'POST', body: '{"on":false}' })
+  const inA = await until(async () => (await archive()).some(r => r.URL === 'https://stamp.test/1'), 30000)
+  check('a save made while A was active lands in sheet A after switching to B', !!inA && !(await archiveOf(BRIDGE2)).some(r => r.URL === 'https://stamp.test/1'))
+  await app.getByLabel('Team project').selectOption('proj-a')
+  check('switching back shows A\'s items', !!(await until(async () => (await app.getByText('Smoke article').count()) > 0 && (await app.getByText('Beta only item').count()) === 0, 8000)))
+
   // Wrong token: parked immediately, no retries.
   await setTeam('wrong')
   await sw.evaluate(() => pipelineEnqueue({ kind: 'capture', capture: { url: 'https://e.test/wrong', sourceType: 'page' } }))
@@ -258,6 +281,7 @@ try {
   check('no page errors', errors.length === 0, errors.join(' | '))
   await context.close()
   server.kill()
+  server2.kill()
 }
 const failed = results.filter(r => !r).length
 console.log(`\n${results.length - failed}/${results.length} checks passed`)

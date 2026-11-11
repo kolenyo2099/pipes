@@ -1,7 +1,7 @@
 // Evidence capture for one saved URL: HRC Archiver's browser engine (src/engine, ported from HRC's Chrome build)
 // drives a real tab over chrome.debugger, then the files, a hashes list, an RFC 3161 timestamp and a manifest are
-// written to Downloads/Pipeline/<id>/. Files stay on this machine; the sheet gets the hashes (see the queue).
-import { browserCapture, browserCaptureTab, DownloadNavigation } from '../engine/browser.js'
+// written to <archive folder>/<project>/<id>/ (archiveFolder.js; Downloads/Pipeline unless the user picked a folder). Files stay on this machine; the sheet gets the hashes (see the queue).
+import { browserCapture, browserCaptureTab, DownloadNavigation, installRecorder } from '../engine/browser.js'
 import { openCaptureWindow, closeWindow } from '../engine/cdp.js'
 import { applyVerdict, expectsMediaDownload, verifyArchive } from '../engine/quality.js'
 import { DEFAULT_MEDIA_CONFIG, hasPlayerHint, imageFiles, mediaLayer, playerPages, playsMedia, probeMedia, removeRecordings, subtitleFiles } from '../engine/media-layer.js'
@@ -9,6 +9,8 @@ import { MEDIA_SOURCE_EXPRESSION, VIDEO_INDICATOR_EXPRESSION } from '../engine/m
 import { timestamp } from '../engine/timestamp.js'
 import { enrich, fallbackCapture } from '../engine/enrich.js'
 import { sha256Hex } from '../engine/util.js'
+import { openStore } from './archiveFolder.js'
+import { getTeam } from './team.js'
 
 const CONFIG = { timeout_ms: 30000, viewport_width: 1440, viewport_height: 900, ...DEFAULT_MEDIA_CONFIG }
 const safe = (value) => String(value).replace(/[^\w.-]+/g, '_').slice(0, 80)
@@ -46,7 +48,12 @@ async function sourceDocument(url) {
   return { status: 'simple_http: success', metadata: { final_url: response.url || url }, files: [{ id: 'source_document', name, blob }] }
 }
 
+const TYPES = { mp4: 'video/mp4', webm: 'video/webm', weba: 'audio/webm', m4a: 'audio/mp4', mp3: 'audio/mpeg', ts: 'video/mp2t' }
 function download(blob, filename) {
+  // Chrome names a download after the blob's type when the two disagree: a recording read back from private storage
+  // has no type, and was saved as .txt. State the type the file name implies.
+  const type = TYPES[filename.split('.').pop().toLowerCase()]
+  if (type && blob.type !== type) blob = blob.slice(0, blob.size, type)
   const url = URL.createObjectURL(blob)
   return new Promise((resolve, reject) => {
     chrome.downloads.download({ url, filename, conflictAction: 'overwrite', saveAs: false }, (downloadId) => {
@@ -67,11 +74,11 @@ function download(blob, filename) {
 export const mediaSummary = (list = []) => list.map(({ name, capture_method, duration, width, height }) => ({ name, method: capture_method, ...(duration && { duration }), ...(width && height && { width, height }) }))
 
 // Write media files next to the page evidence, one by one: a file the disk refuses is dropped and recorded, never fatal.
-async function saveMedia(id, files, result) {
+async function saveMedia(save, files, result) {
   const metadata = result.metadata
   for (const file of files) {
     try {
-      await download(file.blob, `Pipeline/${safe(id)}/${file.name}`)
+      await save(file.blob, file.name)
       result.files.push(file)
       ;(metadata.capture_media ||= []).push({ name: file.name, ...file.properties })
     } catch (error) {
@@ -85,7 +92,7 @@ async function saveMedia(id, files, result) {
 // evidence stands.
 // The page's video sits in another site's player frame: open that player as its own page and save what it plays.
 // ponytail: at most two embeds per page, each a full extra page load; raise the cap if pages with more players matter.
-async function embeddedMedia(id, dom, pageUrl, result, { windowId, temporary }) {
+async function embeddedMedia(save, dom, pageUrl, result, { windowId, temporary }) {
   let saved = false
   let problem = null
   for (const src of playerPages(dom, pageUrl).slice(0, 2)) {
@@ -101,7 +108,7 @@ async function embeddedMedia(id, dom, pageUrl, result, { windowId, temporary }) 
         if (taken.has(file.name)) file.name = `embed-${file.name}`
         file.properties = { ...(await probeMedia(file.blob).catch(() => null)), ...file.properties, embedded_from: src }
       }
-      await saveMedia(id, found.files, result)
+      await saveMedia(save, found.files, result)
       saved ||= found.files.length > 0
       // A recording cut short is saved, but must reach review as partial.
       problem ||= found.error
@@ -115,7 +122,7 @@ async function embeddedMedia(id, dom, pageUrl, result, { windowId, temporary }) 
   return { saved, problem }
 }
 
-async function addMedia(id, url, result, tab, { manual, temporary, windowId }) {
+async function addMedia(save, url, result, tab, { manual, temporary, windowId }) {
   if (!CONFIG.media) return
   const metadata = result.metadata
   let sources = metadata.page_media_sources || []
@@ -141,31 +148,32 @@ async function addMedia(id, url, result, tab, { manual, temporary, windowId }) {
   const scripted = metadata.javascript_enabled_for_media ? { ...metadata, javascript_enabled: true, page_media_sources: sources } : metadata
   if (playsMedia({ url, sources, indicator, hint: hasPlayerHint(dom) })) {
     try {
-      // A manual capture never reloads the user's tab, so it cannot install the recorder: no playback recording.
-      const config = { ...CONFIG, record_playback: CONFIG.record_playback && !manual }
-      const found = await mediaLayer(url, { tab, capture: { metadata: scripted, dom }, config, log: noLog })
+      // A manual capture did not load the page itself, so the recorder is not in it. The page evidence is already
+      // taken: the recorder is added now and the tab is reloaded once if the video has to be recorded from playback.
+      if (manual && CONFIG.record_playback && expectsMediaDownload(url)) await installRecorder(tab).catch(() => {})
+      const found = await mediaLayer(url, { tab, capture: { metadata: scripted, dom }, config: CONFIG, log: noLog })
       temporary.push(...found.temporary)
       for (const file of found.files) file.properties = { ...(await probeMedia(file.blob).catch(() => null)), ...file.properties }
-      await saveMedia(id, found.files, result)
+      await saveMedia(save, found.files, result)
       if (found.error) metadata.media_extraction_error = found.error
     } catch (error) {
       temporary.push(...(error.temporary || []))
-      const embed = windowId != null ? await embeddedMedia(id, dom, url, result, { windowId, temporary }) : { saved: false }
+      const embed = windowId != null ? await embeddedMedia(save, dom, url, result, { windowId, temporary }) : { saved: false }
       // Nothing indicated media on this page, or its embedded player was saved in full: not a failure.
       if (embed.problem) metadata.media_extraction_error = `embedded player: ${embed.problem}`
       else if (error.message !== 'No media found' && !embed.saved) metadata.media_extraction_error = error.message
     }
   } else if (windowId != null && playerPages(dom, url).length) {
-    const embed = await embeddedMedia(id, dom, url, result, { windowId, temporary })
+    const embed = await embeddedMedia(save, dom, url, result, { windowId, temporary })
     if (embed.problem) metadata.media_extraction_error = `embedded player: ${embed.problem}`
     else if (!embed.saved) metadata.media_extraction_error = 'the video plays inside an embedded frame from another site and could not be saved'
   }
   // Images and captions are best effort: a failure is noted in the log, not an issue.
   try {
     const images = await imageFiles(result.image_sources)
-    await saveMedia(id, images.files, result)
+    await saveMedia(save, images.files, result)
     if (images.failed.length) metadata.image_errors = images.failed
-    await saveMedia(id, await subtitleFiles(result.track_sources), result)
+    await saveMedia(save, await subtitleFiles(result.track_sources), result)
   } catch (error) {
     metadata.image_errors = [error.message]
   }
@@ -190,21 +198,33 @@ export async function archiveUrl(job) {
   return result
 }
 
+// Capture windows open right now. If this page goes away mid-capture they would be left behind, so close them.
+const openWindows = new Set()
+globalThis.addEventListener?.('pagehide', () => { for (const id of openWindows) chrome.windows.remove(id).catch(() => {}) })
+const closed = (error) => /debugger detached|detached while handling|no tab with id|target closed|debugger is not attached/i.test(error?.message || '')
+const CLOSED = 'The tab being captured was closed (or the "Pipeline started debugging this browser" bar was cancelled) before the capture finished. Nothing was recorded for this item; archive it again.'
+
 async function capture({ id, url, title, tabId }, state) {
   let windowId = null
   const temporary = []
   const manual = tabId != null
+  let tab
   try {
     if (!/^https?:\/\//i.test(url)) throw new Error('Only http(s) URLs can be archived')
     const options = await getArchiveOptions()
-    let result, tab, restore, liveError
+    const project = (await getTeam())?.label
+    const store = await openStore(download)
+    const save = (blob, name) => store(blob, [...(project ? [safe(project)] : []), safe(id), name])
+    let result, restore, liveError
     if (manual) {
       ;({ result, tab, restore } = await browserCaptureTab(tabId, url, { config: CONFIG, log: noLog }))
     } else {
       windowId = state.windowId = await openCaptureWindow()
+      openWindows.add(windowId)
       try {
         ;({ result, tab } = await browserCapture(url, { config: CONFIG, windowId, recordMedia: CONFIG.media && CONFIG.record_playback && expectsMediaDownload(url), log: noLog }))
       } catch (error) {
+        if (closed(error)) throw error
         if (error instanceof DownloadNavigation) result = await sourceDocument(url)
         else if (options.fallback) liveError = error // maybe an alternate version can still be saved
         else throw error
@@ -212,11 +232,12 @@ async function capture({ id, url, title, tabId }, state) {
     }
     result ||= { status: '', metadata: { navigation_error: liveError.message }, files: [] }
     try {
-      if (tab) await addMedia(id, url, result, tab, { manual, temporary, windowId })
+      if (tab) await addMedia(save, url, result, tab, { manual, temporary, windowId })
     } finally {
       await restore?.()
       await tab?.close()
     }
+    if (tab?.detached) throw new Error(CLOSED)
     const metadata = result.metadata
     const verdict = verifyArchive({ status: result.status, metadata, media: result.files.map((f) => ({ filename: f.name, properties: { id: f.id }, _mimetype: f.mimetype || f.blob.type })) }, { url })
     applyVerdict(metadata, verdict)
@@ -242,7 +263,6 @@ async function capture({ id, url, title, tabId }, state) {
       Object.assign(metadata, extra.metadata)
     }
 
-    const folder = `Pipeline/${safe(id)}`
     const written = new Set(result.files.filter((f) => f.properties).map((f) => f.name)) // media: already on disk
     const out = result.files.map(({ name, blob }) => ({ name, blob }))
     const files = []
@@ -260,7 +280,7 @@ async function capture({ id, url, title, tabId }, state) {
     const manifest = await buildManifest({ id, url, title: title || metadata.title, finalUrl: metadata.final_url, capturedAt: new Date().toISOString(), status, issues: metadata.capture_issues, files, tsa: stamped?.tsa ?? null, captureMode: manual ? 'manual' : null, media: metadata.capture_media,
       extra: { ...(metadata.source_dates && { source_dates: metadata.source_dates }), ...(metadata.wayback && { wayback: metadata.wayback }), ...(metadata.substitution && { substitution: metadata.substitution }) } })
     out.push({ name: 'manifest.json', blob: new Blob([manifest.text], { type: 'application/json' }) })
-    for (const f of out) if (!written.has(f.name)) await download(f.blob, `${folder}/${f.name}`)
+    for (const f of out) if (!written.has(f.name)) await save(f.blob, f.name)
 
     return {
       status, evidence_hash: manifest.sha256,
@@ -276,9 +296,12 @@ async function capture({ id, url, title, tabId }, state) {
       ...(status === 'needs_review' && { error: metadata.capture_issue_summary })
     }
   } catch (error) {
+    if (tab?.detached || closed(error)) return { status: 'cancelled', error: CLOSED }
+    if (error?.cancel) return { status: 'cancelled', error: error.message }
     return { status: 'failed', error: error?.message || String(error) }
   } finally {
     await removeRecordings(temporary)
     await closeWindow(windowId)
+    openWindows.delete(windowId)
   }
 }

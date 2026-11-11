@@ -10,9 +10,48 @@ export function decodeJoinCode(code) {
 }
 
 // Null outside the extension (tests, plain web page) as well as before the join code is pasted.
-export const getTeam = async () => (await globalThis.chrome?.storage?.local?.get('pipelineTeam'))?.pipelineTeam || null
-export const setTeam = async ({ code, name }) => {
-  const team = { ...decodeJoinCode(code), name: String(name || '').trim() }
-  await chrome.storage.local.set({ pipelineTeam: team })
+// pipelineTeams = [{id, label, url, token, name}]; pipelineTeam = the active one (public/outbox.js reads it).
+const local = () => globalThis.chrome?.storage?.local
+export const getTeam = async () => (await local()?.get('pipelineTeam'))?.pipelineTeam || null
+
+export async function listTeams() {
+  const stored = await local()?.get(['pipelineTeams', 'pipelineTeam'])
+  if (!stored) return []
+  if (stored.pipelineTeams) return stored.pipelineTeams
+  if (!stored.pipelineTeam) return []
+  // Lazy migration of a single-team install.
+  const team = { id: stored.pipelineTeam.id || crypto.randomUUID(), label: 'Team project', ...stored.pipelineTeam }
+  await local().set({ pipelineTeams: [team], pipelineTeam: team })
+  return [team]
+}
+
+export async function addTeam({ code, name, label }) {
+  const joined = decodeJoinCode(code)
+  label = String(label || '').trim()
+  if (!label) throw new Error('Give the project a name')
+  const teams = await listTeams()
+  const existing = teams.find(t => t.url === joined.url)
+  const team = { id: existing?.id || crypto.randomUUID(), label, ...joined, name: String(name || '').trim() }
+  await local().set({ pipelineTeams: existing ? teams.map(t => t === existing ? team : t) : [...teams, team], pipelineTeam: team })
   return team
 }
+
+export async function switchTeam(id) {
+  const team = (await listTeams()).find(t => t.id === id)
+  if (!team) throw new Error('Unknown project')
+  await local().set({ pipelineTeam: team })
+  return team
+}
+
+export async function removeTeam(id) {
+  const teams = (await listTeams()).filter(t => t.id !== id)
+  const active = await getTeam()
+  await local().set({ pipelineTeams: teams })
+  if (active?.id !== id) return active
+  if (!teams.length) { await local().remove('pipelineTeam'); return null }
+  await local().set({ pipelineTeam: teams[0] })
+  return teams[0]
+}
+
+// Single-project callers: join (or update) with a default label.
+export const setTeam = ({ code, name, label }) => addTeam({ code, name, label: label || 'Team project' })

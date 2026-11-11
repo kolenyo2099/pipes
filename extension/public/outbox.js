@@ -32,8 +32,11 @@ async function pipelineEnqueue(item) {
   if (item?.kind === 'capture' ? !item.capture?.url : item?.kind !== 'canary' || !item.ref || !item.headers || !item.values) return { ok: false, error: 'Invalid item' }
   const sent = (await store(SENT)) || {}
   const queued = await mutate(queue => {
-    if (item.key && (sent[item.key] || queue.some(i => i.key === item.key))) return false
-    const entry = { ...item, uid: Date.now() + Math.random(), retries: 0 }
+    // "Already sent" is per project: the same page may be saved into another project's sheet.
+    const key = item.key && `${team.url} ${item.key}`
+    if (key && (sent[key] || queue.some(i => i.key === key))) return false
+    // Stamped now: a later switch of the active project must not redirect what was saved here.
+    const entry = { ...item, key, uid: Date.now() + Math.random(), retries: 0, team: { url: team.url, token: team.token } }
     if (entry.kind === 'capture') entry.capture = { ...entry.capture, savedBy: entry.capture.savedBy || team.name || '' }
     queue.push(entry)
     return true
@@ -71,11 +74,12 @@ async function drain() {
   try {
     await new Promise(r => setTimeout(r, 300)) // let a burst of enqueues (Save all) land in one batch
     for (;;) {
-      const active = ((await store(OUTBOX)) || []).filter(i => !i.parked)
+      const current = await getTeam()
+      const active = ((await store(OUTBOX)) || []).filter(i => !i.parked) // entries without a stamp (older queue) go to the active team
       if (!active.length) return
       const head = active[0]
-      const batch = head.kind === 'canary' ? [head] : active.filter(i => i.kind === 'capture').slice(0, BATCH)
-      const team = await getTeam()
+      const team = head.team || current
+      const batch = head.kind === 'canary' ? [head] : active.filter(i => i.kind === 'capture' && (i.team || current).url === team.url && (i.team || current).token === team.token).slice(0, BATCH)
       let results, failure
       try {
         if (!configured(team)) throw { message: 'Team not configured', fatal: true }

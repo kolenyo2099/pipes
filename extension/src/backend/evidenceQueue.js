@@ -62,6 +62,8 @@ export async function archiveOne(item, deps = real, { tabId } = {}) {
   let result
   try {
     result = await deps.archive({ id: item.id, url: item.url, title: item.title, ...(tabId != null && { tabId }) })
+    // The tab was closed under the capture: not a result. The item stays as it was, to be archived again.
+    if (result.status === 'cancelled') return result
     const update = { id: item.id, status: result.status, result_metadata: { capture_issues: result.issues || [], ...(result.error && { error: result.error }), ...(result.media?.length && { media: result.media }), ...((tabId != null || result.capture_mode) && { capture_mode: 'manual' }), ...(result.wayback_url && { wayback_url: result.wayback_url }), ...(result.substitution && { substitution: result.substitution }) } }
     // The page's own publication date fills the sheet column only when nobody set one.
     if (result.published_at && !item.published_at) update.fields = { 'Published At': result.published_at }
@@ -129,6 +131,6 @@ export async function listManualTabs(queue) {
 /** Capture the entry's tab as it stands and write it back through the usual flow. */
 export async function archiveManual(entry, deps = real) {
   const result = await archiveOne(entry.item, deps, { tabId: entry.tabId })
-  if (result.status !== 'failed' && !result.skipped) await forgetManualTab(entry.tabId)
+  if (!['failed', 'cancelled'].includes(result.status) && !result.skipped) await forgetManualTab(entry.tabId)
   return result
 }

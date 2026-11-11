@@ -17,6 +17,7 @@ import { expectsMediaDownload } from './quality.js'
 import { sleep, uuid } from './util.js'
 import { base64ToBlob } from './cdp.js'
 import { baseMime, extensionForMime, media, MediaFiles } from './media-model.js'
+import { muxAV } from './media/mux.js'
 
 // ponytail: progressive files go through response.blob(), which Chrome backs with disk, so one file may be up to
 // 1.5 GB; HLS/DASH streams are capped at 500 MB (media/net.js) because their segments are held in memory until
@@ -308,9 +309,30 @@ async function ownRuns(targets, length, log) {
   return own.length ? own : measured.every((m) => m.duration == null) ? targets : null
 }
 
+// The runs of one video: the player first fetches a little at a starting quality, then settles on the final one.
+// Those first runs are fragments, though their headers state the full length. Keep the final video and audio and
+// join them into one MP4; if joining fails the two files are kept as they are.
+// ponytail: "largest file" stands in for "the complete run"; compare packet time ranges if that ever picks wrong.
+async function joinRuns(targets, temporary, log) {
+  const largest = (audio) => targets.filter((t) => baseMime(t.mseMimeType).startsWith('audio/') === audio).sort((a, b) => b.file.size - a.file.size)[0]
+  const video = largest(false)
+  const audio = largest(true)
+  if (!video || !audio) return [video || audio].filter(Boolean)
+  try {
+    const name = `${uuid()}.part`
+    const handle = await (await recordingsDir(true)).getFileHandle(name, { create: true })
+    temporary.push(name)
+    await muxAV(video.file, audio.file, await handle.createWritable())
+    return [{ ...video, file: await handle.getFile(), mime: 'video/mp4', mseMimeType: `${video.mseMimeType} + ${audio.mseMimeType}` }]
+  } catch (error) {
+    log({ level: 'warning', message: `Could not join video and audio into one file (${error.message}); saving them separately` })
+    return [video, audio]
+  }
+}
+
 function addRecorded(files, targets, url, truncated) {
   for (const target of targets) {
-    const mime = baseMime(target.mseMimeType)
+    const mime = target.mime || baseMime(target.mseMimeType)
     files.add(mime.startsWith('audio/') ? 'audio' : 'video', mime.startsWith('audio/') ? 'recorded-audio' : 'recorded-video', target.file, mime, {
       capture_method: 'mse-recording', source_urls: [url], mse_mime_type: target.mseMimeType, truncated
     })
@@ -347,6 +369,19 @@ async function recordPlayback(url, tab, config, files, log, scriptsRan, temporar
     // Ads the selector above does not know still show up as a different video id: wait them out.
     for (let waited = 0; waited < 90_000 && (await tab.call(requestedVideoInPage, youtubeId).catch(() => null))?.moved; waited += 1000) await sleep(1000)
   }
+  // The page itself states how long the requested video is. While the player shows another length it is playing
+  // something else (an ad no selector above knows): wait for the real one, and never take the ad's length as the goal.
+  const known = requested?.length ?? (youtubeId ? (await tab.call(requestedVideoInPage, youtubeId).catch(() => null))?.length : null) ?? null
+  // Reading the length also nudges whatever is showing to play out muted (and presses a skip button if there is one).
+  const playerLength = `(() => { const v = [...document.querySelectorAll('video')].find((v) => v.duration > 0); if (!v) return null;
+    if (Math.abs(v.duration - ${Number(known)}) > 2) { v.muted = true; v.play?.().catch(() => {}); document.querySelector('.ytp-skip-ad-button, .ytp-ad-skip-button, .ytp-ad-skip-button-modern')?.click(); }
+    return v.duration })()`
+  for (let waited = 0; known && waited < 120_000; waited += 1000) {
+    const now = await tab.evaluate(playerLength).catch(() => null)
+    if (now == null || Math.abs(now - known) <= 2) break
+    if (waited === 0) log({ level: 'info', message: `The player shows a ${Math.round(now)}s clip, not the ${known}s video (an ad); waiting` })
+    await sleep(1000)
+  }
   const started = await tab.call(startPlaybackInPage, config.record_rate)
   if (!started) return false
   log({ level: 'info', message: `Recording playback at ${config.record_rate}x${started.quality ? ` (quality ${started.quality})` : ''}` })
@@ -355,7 +390,7 @@ async function recordPlayback(url, tab, config, files, log, scriptsRan, temporar
   const deadline = Date.now() + config.max_record_minutes * 60_000
   let lastTime = -1
   let reached = 0 // how far the player had fetched, which runs ahead of playback
-  let length = started.duration ?? requested?.length ?? null // NaN arrives as null over DevTools
+  let length = known ?? started.duration ?? null // NaN arrives as null over DevTools
   let stalledSince = Date.now()
   while (Date.now() < deadline) {
     await sleep(2000)
@@ -394,7 +429,8 @@ async function recordPlayback(url, tab, config, files, log, scriptsRan, temporar
   temporary.push(...sink.names)
   const targets = await sink.finish()
   // Nothing as long as the video: keep what there is, the length check below sends it to review as partial.
-  addRecorded(files, (await ownRuns(targets, length, log)) || targets, url, Boolean(sink.summary?.truncated || saveError))
+  const own = await ownRuns(targets, length, log)
+  addRecorded(files, own ? await joinRuns(own, temporary, log) : targets, url, Boolean(sink.summary?.truncated || saveError))
   if (saveError) throw new Error(`the recording could not be saved completely: ${saveError.message}`)
   // Anything short of the full length is evidence of a failure, not a capture.
   if (!files.hasAV) throw new Error('playback recording saved no audio/video')

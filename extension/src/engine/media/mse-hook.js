@@ -49,6 +49,18 @@
       ? new Uint8Array(data.slice(0))
       : new Uint8Array(data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength));
 
+  // YouTube offers every video as H.264 + AAC as well as AV1/VP9 + Opus. Asked only for the former (the way the
+  // h264ify extension does), the saved file plays in any player. Only where this browser can play H.264 itself.
+  if (/(^|\.)youtube(-nocookie)?\.com$/.test(location.hostname)) {
+    const supported = MediaSource.isTypeSupported.bind(MediaSource);
+    if (supported('video/mp4; codecs="avc1.4d401f"') && supported('audio/mp4; codecs="mp4a.40.2"')) {
+      const other = /webm|vp0?[89]|av01|opus/i;
+      MediaSource.isTypeSupported = (type) => !other.test(type) && supported(type);
+      const canPlayType = HTMLMediaElement.prototype.canPlayType;
+      HTMLMediaElement.prototype.canPlayType = function (type) { return other.test(type) ? '' : canPlayType.call(this, type); };
+    }
+  }
+
   const addSourceBuffer = MediaSource.prototype.addSourceBuffer;
   MediaSource.prototype.addSourceBuffer = function (mimeType) {
     const sourceBuffer = addSourceBuffer.call(this, mimeType);

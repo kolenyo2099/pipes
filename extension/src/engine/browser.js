@@ -484,6 +484,9 @@ export async function browserCaptureTab(tabId, url, { config, log }) {
   }
 }
 
+/** Have the playback recorder present in the tab's next page load (a manual capture adds it after the fact). */
+export const installRecorder = (tab) => tab.send('Page.addScriptToEvaluateOnNewDocument', { source: MSE_HOOK });
+
 // The capture froze scripts and may have resized the viewport; it is the user's tab, so undo both.
 async function release(tab) {
   await tab.send('Emulation.setScriptExecutionDisabled', { value: false }).catch(() => {});

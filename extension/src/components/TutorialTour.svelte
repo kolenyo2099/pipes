@@ -14,17 +14,17 @@
     },
     {
       title: '1 · Your team Library',
-      body:  'Everything the team saved lives in the <strong>Library</strong>, with its archive and processing state.',
+      body:  'Everything the team saved lives in the <strong>Library</strong> of the active team project (switch or join projects above it), with its archive and processing state.',
       target: '[data-tour="nav-library"]',
     },
     {
-      title: '2 · Create a Canary project',
-      body:  'A <strong>project</strong> bundles your watchlist rules, collected items, and export settings. Hit <strong>"+ New Project"</strong> to get started.',
+      title: '2 · Create a Canary monitor',
+      body:  'A <strong>monitor</strong> (private to this browser) bundles your watchlist rules, collected items, and export settings. Hit <strong>"+ New monitor"</strong> to get started.',
       target: '[data-tour="project-area"]',
     },
     {
       title: '3 · Define watchlist rules',
-      body:  'Open <strong>Project Settings</strong> and use the <strong>Query Builder</strong> to combine keywords, CAMEO event codes, actor types, and country codes — this shapes exactly what GDELT collects for you.',
+      body:  'Open <strong>Monitor settings</strong> and use the <strong>Query Builder</strong> to combine keywords, CAMEO event codes, actor types, and country codes — this shapes exactly what GDELT collects for you.',
       target: '[data-tour="nav-settings"]',
     },
     {
@@ -44,7 +44,7 @@
     },
     {
       title: '✓ You\'re all set',
-      body:  'Create your first project, add a watchlist rule, and come back in 15 minutes for your first events. Use <strong>? Tour</strong> at the bottom of the sidebar to replay anytime, or <strong>ℹ About</strong> for contact information.',
+      body:  'Create your first monitor, add a watchlist rule, and come back in 15 minutes for your first events. Use <strong>? Tour</strong> at the bottom of the sidebar to replay anytime, or <strong>ℹ About</strong> for contact information.',
       target: null,
     },
   ]

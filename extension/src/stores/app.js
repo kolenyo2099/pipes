@@ -1,4 +1,5 @@
 import { writable, derived } from 'svelte/store'
+import { getTeam, listTeams } from '../backend/team.js'
 
 // ── Navigation ─────────────────────────────────────────────────────────────────
 // Views: 'library' (home) | 'explore' | 'archive' | 'team-searches' | 'team' | Canary: 'inbox' | 'saved' | 'dismissed' | 'timeline' | 'settings' | 'logs' | 'new-project'
@@ -7,8 +8,16 @@ export const currentProjectId = writable(null)
 
 // ── Data ───────────────────────────────────────────────────────────────────────
 export const projects = writable([])
-// Joined team ({url, token, name}): null when not joined, undefined until boot has looked.
+// The ACTIVE team project ({id, label, url, token, name}): null when not joined, undefined until boot has looked.
 export const teamState = writable(undefined)
+// Every joined team project.
+export const teams = writable([])
+// Re-read both from chrome.storage; App.svelte calls it at boot and on every storage change.
+export async function syncTeams() {
+  const [active, all] = await Promise.all([getTeam(), listTeams()])
+  teams.set(all)
+  teamState.update(current => (current?.id === active?.id && current?.url === active?.url && current?.token === active?.token ? current : active))
+}
 // First run = no team and no Canary project: home shows the welcome screen and the tour waits.
 export const onboarding = derived([teamState, projects], ([t, p]) => t === null && p.length === 0)
 export const currentProject = writable(null)

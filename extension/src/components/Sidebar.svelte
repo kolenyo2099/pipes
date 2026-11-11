@@ -3,7 +3,7 @@
   import CollectorStatus from './CollectorStatus.svelte'
   import {
     currentView, currentProjectId, currentProject,
-    projects, stats, notify, tourOpen, guideOpen, aboutOpen,
+    projects, stats, notify, teamState, teams, syncTeams, tourOpen, guideOpen, aboutOpen,
   } from '../stores/app.js'
 
   export let onNavigate = () => {}
@@ -25,6 +25,13 @@
   function setProject(id) {
     currentProjectId.set(id)
     currentView.set('inbox')
+  }
+
+  async function switchProject(id) {
+    const result = await api.switchTeam(id)
+    if (!result.ok) return notify('error', result.error)
+    await syncTeams()
+    if (!['library', 'explore', 'archive', 'team-searches'].includes($currentView)) setView('library')
   }
 
   let restoreInput
@@ -91,15 +98,34 @@
     </div>
   </div>
 
-  <!-- Team home: always visible, independent of Canary projects -->
-  <nav class="nav team-nav">
-    <button class="nav-item" class:active={$currentView === 'library'} data-tour="nav-library" on:click={() => setView('library')}><span class="nav-icon">📚</span>Library</button>
-    <button class="nav-item" class:active={$currentView === 'explore'} on:click={() => setView('explore')}><span class="nav-icon">🧭</span>Explore</button>
-    <button class="nav-item" class:active={$currentView === 'archive'} on:click={() => setView('archive')}><span class="nav-icon">🗄</span>Archive</button>
-  </nav>
+  <!-- Collaborate: shared through the active team project's Google Sheet -->
+  <section class="group group--team" aria-label="Collaborate">
+    <div class="group-head">Collaborate</div>
+    <p class="group-caption">Shared with your team through the project's Google Sheet</p>
+    <div class="project-switcher" data-tour="team-area">
+      {#if $teamState}
+        <select class="project-select" aria-label="Team project" value={$teamState.id} on:change={e => switchProject(e.target.value)}>
+          {#each $teams as t (t.id)}<option value={t.id}>{t.label}</option>{/each}
+        </select>
+      {:else}
+        <p class="empty-hint">No team project joined yet</p>
+      {/if}
+      <button class="btn-new-project" class:active={$currentView === 'team'} on:click={() => setView('team')}>Join or manage projects</button>
+    </div>
+    {#if $teamState}
+      <nav class="nav">
+        <button class="nav-item" class:active={$currentView === 'library'} data-tour="nav-library" on:click={() => setView('library')}><span class="nav-icon">📚</span>Library</button>
+        <button class="nav-item" class:active={$currentView === 'explore'} on:click={() => setView('explore')}><span class="nav-icon">🧭</span>Explore</button>
+        <button class="nav-item" class:active={$currentView === 'archive'} on:click={() => setView('archive')}><span class="nav-icon">🗄</span>Archive</button>
+        <button class="nav-item" class:active={$currentView === 'team-searches'} on:click={() => setView('team-searches')}><span class="nav-icon">🔎</span>Team searches</button>
+      </nav>
+    {/if}
+  </section>
 
-  <!-- Project switcher -->
-  <div class="section-label">Monitor (Canary)</div>
+  <!-- Monitor: Canary, local to this browser -->
+  <section class="group group--monitor" aria-label="Monitor">
+    <div class="group-head">Monitor</div>
+    <p class="group-caption">Private to this browser: your own Canary searches and inbox</p>
   <!-- GDELT Reference guide trigger -->
   <button class="btn-guide" on:click={() => guideOpen.set(true)} title="GDELT reference guide">
     📖 GDELT Reference
@@ -107,21 +133,21 @@
 
   <div class="project-switcher" data-tour="project-area">
     {#if $projects.length === 0}
-      <p class="empty-hint">No projects yet</p>
+      <p class="empty-hint">No monitors yet</p>
     {:else}
       <select
         class="project-select"
         value={$currentProjectId || ''}
         on:change={e => setProject(e.target.value)}
       >
-        <option value="" disabled>Select a project…</option>
+        <option value="" disabled>Select a monitor…</option>
         {#each $projects as p}
           <option value={p.project_id}>{p.name}</option>
         {/each}
       </select>
     {/if}
     <button class="btn-new-project" on:click={() => setView('new-project')}>
-      + New Project
+      + New monitor
     </button>
   </div>
 
@@ -187,7 +213,7 @@
         on:click={() => setView('settings')}
       >
         <span class="nav-icon">⚙</span>
-        Project Settings
+        Monitor settings
       </button>
     </nav>
 
@@ -208,16 +234,6 @@
     </div>
   {/if}
 
-  <nav class="nav">
-    <button class="nav-item" class:active={$currentView === 'team-searches'} on:click={() => setView('team-searches')}><span class="nav-icon">🔎</span>Team searches</button>
-  </nav>
-
-  <!-- Team works without any Canary project: browser capture only needs the join code -->
-  <div class="section-label">Team</div>
-  <div class="quick-actions">
-    <button class="action-btn" class:active={$currentView === 'team'} on:click={() => setView('team')}>👥 Team sheet</button>
-  </div>
-
   <!-- Backup: data lives only in this browser profile; removing the extension deletes it -->
   <div class="section-label">Backup</div>
   <div class="quick-actions">
@@ -225,6 +241,7 @@
     <button class="action-btn" on:click={() => restoreInput.click()}>⬆ Restore backup</button>
     <input hidden type="file" accept="application/json,.json" bind:this={restoreInput} on:change={restoreBackup} />
   </div>
+  </section>
 
   <!-- Bottom bar: Tour + About — pinned to bottom -->
   <div class="bottom-bar">
@@ -301,7 +318,17 @@
   .btn-new-project:hover { background: rgba(42, 36, 16, 0.1); }
   .empty-hint { font-size: 0.78rem; margin: 0; opacity: 0.75; }
 
-  .team-nav { padding-top: 0.5rem; }
+  /* Two labelled groups: team (shared, lighter tint) and monitor (private, darker tint). */
+  .group { border-radius: 8px; margin: 0.5rem 0.5rem 0; padding-bottom: 0.4rem; }
+  .group--team { background: rgba(255, 255, 255, 0.4); border: 1.5px solid var(--canary-ink); }
+  .group--monitor { background: rgba(42, 36, 16, 0.1); border: 1.5px dashed rgba(42, 36, 16, 0.45); }
+  .group-head { font: 800 0.8rem/1.4 var(--display); letter-spacing: 0.06em; padding: 0.5rem 0.6rem 0; text-transform: uppercase; }
+  .group-caption { font-size: 0.7rem; line-height: 1.35; margin: 0; opacity: 0.8; padding: 0.1rem 0.6rem 0.2rem; }
+  .group .project-switcher { padding: 0.3rem 0.5rem 0.5rem; }
+  .group .nav { padding: 0 0.25rem; }
+  .group .section-label { padding-inline: 0.6rem; }
+  .group .quick-actions { padding-inline: 0.25rem; }
+  .btn-new-project.active { background: var(--canary-ink); border-style: solid; color: var(--canary); }
   .nav { display: flex; flex-direction: column; gap: 2px; padding: 0 0.5rem; }
   .nav-item {
     align-items: center;

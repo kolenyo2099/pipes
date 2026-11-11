@@ -4,7 +4,7 @@ Every save in the extension, from any source, goes through one outbox that lives
 
 ## Team settings
 
-`chrome.storage.local` key `pipelineTeam` = `{ url, token, name }`.
+`chrome.storage.local` key `pipelineTeams` = `[{ id, label, url, token, name }]` (every joined project) and `pipelineTeam` = the active one, same shape. Each queued outbox entry is stamped with `team: { url, token }` when saved and delivered to that sheet, even if the active project changes meanwhile.
 - `url` and `token` come from the join code: `base64url(JSON.stringify({url, token}))` (made by the sheet's "Pipeline → Team setup" menu). Decode by mapping `-`→`+` and `_`→`/` and restoring `=` padding, then `atob`, then `JSON.parse`. Reject it unless `url` starts with `https://script.google.com/` and `token` is a non-empty string.
 - `name` is the person's display name. It becomes `savedBy` / `saved_by`.
 

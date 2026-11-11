@@ -16,10 +16,9 @@
   import Explore from './views/Explore.svelte'
   import Archive from './views/Archive.svelte'
   import TeamSearches from './components/TeamSearches.svelte'
-  import { getTeam } from './backend/team.js'
   import {
     currentView, currentProjectId, currentProject,
-    projects, stats, isLoading, teamState, ontology, notification, filters, clearFilters,
+    projects, stats, isLoading, teamState, syncTeams, ontology, notification, filters, clearFilters,
   } from './stores/app.js'
 
   // Keep shared filters visible and reversible even when their originating
@@ -46,12 +45,12 @@
   async function boot() {
     isLoading.set(true)
     // Load projects and ontology in parallel
-    const [projectsResult, ontologyResult, team] = await Promise.all([
+    const [projectsResult, ontologyResult] = await Promise.all([
       api.listProjects(),
       api.getOntology(),
-      getTeam(),
+      syncTeams(),
     ])
-    teamState.set(team)
+    const team = $teamState
     isLoading.set(false)
     if (projectsResult.ok) {
       projects.set(projectsResult.data)
@@ -86,8 +85,14 @@
   onMount(() => {
     boot().then(() => settleSheets())
     const onMessage = message => { if (message?.type === 'pipeline:delivered') settleSheets() }
+    // Joining, switching or leaving a project (from any page) re-keys the team views below.
+    const onStorage = (changes, area) => { if (area === 'local' && (changes.pipelineTeam || changes.pipelineTeams)) syncTeams() }
     globalThis.chrome?.runtime?.onMessage?.addListener(onMessage)
-    return () => globalThis.chrome?.runtime?.onMessage?.removeListener(onMessage)
+    globalThis.chrome?.storage?.onChanged?.addListener(onStorage)
+    return () => {
+      globalThis.chrome?.runtime?.onMessage?.removeListener(onMessage)
+      globalThis.chrome?.storage?.onChanged?.removeListener(onStorage)
+    }
   })
 </script>
 
@@ -114,9 +119,9 @@
     {:else if $currentView === 'team'}
       <TeamSettings />
     {:else if $currentView === 'archive'}
-      <Archive />
+      {#key $teamState?.id}<Archive />{/key}
     {:else if $currentView === 'team-searches'}
-      <TeamSearches />
+      {#key $teamState?.id}<TeamSearches />{/key}
     {:else if !$teamState && ['library', 'explore'].includes($currentView)}
       <div class="no-project">
         <div class="welcome-icon">◈</div>
@@ -130,9 +135,9 @@
         <button class="btn-link" on:click={() => currentView.set('new-project')}>Use Canary monitoring only</button>
       </div>
     {:else if $currentView === 'library'}
-      <Library />
+      {#key $teamState?.id}<Library />{/key}
     {:else if $currentView === 'explore'}
-      <Explore />
+      {#key $teamState?.id}<Explore />{/key}
     {:else if !$currentProjectId}
       <div class="no-project">
         <div class="welcome-icon">◈</div>

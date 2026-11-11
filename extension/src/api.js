@@ -8,7 +8,7 @@ import { ontology, searchThemes } from './backend/ontology.js'
 import { runProjectNow, channel, BUDGETS, budgetUsed, BROKEN_LANES } from './backend/collect.js'
 import { buildSheetRow } from './backend/sheets.js'
 import { bridge } from './backend/bridge.js'
-import { getTeam, setTeam } from './backend/team.js'
+import { getTeam, addTeam, switchTeam, removeTeam } from './backend/team.js'
 import { validateToken, collectionSearch, configuredToken, TOKEN_SETTING } from './backend/mediacloud.js'
 import { BLUESKY_ACCOUNT, blueskySignIn } from './backend/bluesky.js'
 import { archiveItem, archiveBatch, openSnapshot, openArchivesFolder } from './backend/archive.js'
@@ -212,7 +212,9 @@ export const api = {
   // Shared browser NLP models; inference stays in the offscreen collector.
   reconcileSheets: () => call(reconcileSheets),
   getTeamStatus: () => call(async () => ({ team: await getTeam(), outbox: await chrome.runtime.sendMessage({ type: 'pipeline:status' }) })),
-  saveTeam: data => call(() => setTeam(data)),
+  addTeam: data => call(() => addTeam(data)),
+  switchTeam: id => call(() => switchTeam(id)),
+  removeTeam: id => call(() => removeTeam(id)),
   checkTeam: () => call(checkTeam),
   retryOutbox: () => call(() => chrome.runtime.sendMessage({ type: 'pipeline:retry' })),
   getNlpStatus: () => call(nlpStatus),

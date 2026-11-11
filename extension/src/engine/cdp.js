@@ -15,7 +15,11 @@ function listen() {
   chrome.debugger.onEvent.addListener((source, method, params) => tabs.get(source.tabId)?.dispatch(method, params));
   chrome.debugger.onDetach.addListener((source, reason) => {
     const tab = tabs.get(source.tabId);
-    if (tab) tab.detached = reason;
+    if (!tab) return;
+    tab.detached = reason;
+    // Nothing more will arrive from a closed tab: fail what is waiting now rather than at its timeout.
+    for (const waiter of tab.waiters) waiter.reject(new Error(`Chrome debugger detached: ${reason}`));
+    tab.waiters.clear();
   });
 }
 
@@ -99,7 +103,7 @@ export class CaptureTab {
 
   waitFor(method, timeoutMs, accept = () => true) {
     return new Promise((resolve, reject) => {
-      const waiter = { method, accept, resolve };
+      const waiter = { method, accept, resolve, reject };
       this.waiters.add(waiter);
       setTimeout(() => {
         if (this.waiters.delete(waiter)) reject(new TimeoutError(`Timeout ${timeoutMs}ms exceeded waiting for ${method}`));

@@ -98,4 +98,26 @@ describe('outbox', () => {
     expect(fetch).toHaveBeenCalledTimes(4)
     expect(await send({ type: 'pipeline:status' })).toMatchObject({ parked: 1, lastError: 'offline' })
   })
+
+  it('delivers to the project that was active when it was saved, in one batch per project', async () => {
+    fetch = vi.fn(async (_url, init) => reply(JSON.stringify({ ok: true, results: JSON.parse(init.body).items.map(() => ({ ok: true })) })))
+    const send = load()
+    const B = { url: 'https://script.google.com/macros/s/b/exec', token: 'tokB', name: 'Ana' }
+    await send({ type: 'pipeline:save', item: capture(1) })
+    data.pipelineTeam = B // switched before delivery
+    await send({ type: 'pipeline:save', item: capture(2) })
+    await settle()
+    const calls = fetch.mock.calls.map(([url, init]) => [url, JSON.parse(init.body)])
+    expect(calls.map(([url, body]) => [url, body.token, body.items.length])).toEqual([[TEAM.url, 'tok', 1], [B.url, 'tokB', 1]])
+    expect((await send({ type: 'pipeline:status' })).pending).toBe(0)
+  })
+
+  it('sends an unstamped (older) entry to the active team', async () => {
+    fetch = vi.fn(async () => reply(JSON.stringify({ ok: true, results: [{ ok: true }] })))
+    const send = load()
+    data.pipelineOutbox = [{ ...capture(9), uid: 1, retries: 0 }]
+    await send({ type: 'pipeline:drain' })
+    await settle()
+    expect(fetch.mock.calls[0][0]).toBe(TEAM.url)
+  })
 })
