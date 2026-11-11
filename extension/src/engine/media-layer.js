@@ -27,7 +27,7 @@ const MAX_IMAGE_FILES = 24
 const HLS_MIME = { '.ts': 'video/mp2t', '.mp4': 'video/mp4', '.m4a': 'audio/mp4', '.aac': 'audio/aac', '.mp3': 'audio/mpeg' }
 
 // Signs that a page carries a media player. A static (scripts-off) capture never runs the player.
-const PLAYER_HINT = /<video|<audio|jwplayer|video-js|videojs|brightcove|hls(\.min)?\.js|dash(\.all)?(\.min)?\.js|shaka-player|\.m3u8|\.mpd\b/i
+const PLAYER_HINT = /<video|<audio|"(Video|Audio)Object"|og:(video|audio)|jwplayer|video-js|videojs|brightcove|hls(\.min)?\.js|dash(\.all)?(\.min)?\.js|shaka-player|\.m3u8|\.mpd\b/i
 const SETTLE_MS = 8000
 // A server that stalls mid-file must not wedge the queue: whole-file fetches (headers and body) get this long.
 const MEDIA_FETCH_MS = 10 * 60_000
@@ -110,7 +110,40 @@ async function wakePlayers(tab, log, { reload }) {
   return (await tab.evaluate(MEDIA_SOURCE_EXPRESSION).catch(() => [])) ?? []
 }
 
-async function siteMedia(url, tab) {
+/**
+ * Media the page itself declares as its own: schema.org VideoObject/AudioObject contentUrl and og:video/og:audio.
+ * This is the article's main clip, which a page with several players would otherwise get wrong. Pure.
+ */
+export function declaredMedia(dom, baseUrl) {
+  const found = new Map()
+  const add = (kind, value) => {
+    try { const url = new URL(String(value).replace(/&amp;/g, '&'), baseUrl).href; if (/^https?:/.test(url) && !found.has(url)) found.set(url, { kind, url }) } catch { /* not an address */ }
+  }
+  const walk = (node) => {
+    if (Array.isArray(node)) return node.forEach(walk)
+    if (!node || typeof node !== 'object') return
+    const types = [].concat(node['@type'] || [])
+    const kind = types.includes('VideoObject') ? 'video' : types.includes('AudioObject') ? 'audio' : null
+    if (kind && node.contentUrl) add(kind, node.contentUrl)
+    Object.values(node).forEach(walk)
+  }
+  for (const [, json] of String(dom || '').matchAll(/<script[^>]+application\/ld\+json[^>]*>([\s\S]*?)<\/script>/gi)) {
+    try { walk(JSON.parse(json)) } catch { /* malformed block */ }
+  }
+  for (const [tag, kind] of String(dom || '').matchAll(/<meta[^>]+property="og:(video|audio)(?::(?:secure_)?url)?"[^>]*>/gi)) {
+    const content = /content="([^"]+)"/i.exec(tag)?.[1]
+    // og:video is often a player page, not a file: only take what looks like media.
+    if (content && /\.(mp4|m4v|webm|mov|mp3|m4a|aac|ogg|m3u8|mpd)(\?|$)/i.test(content)) add(kind.toLowerCase(), content)
+  }
+  return [...found.values()]
+}
+
+const MEDIA_FILE = /\.(mp4|m4v|webm|mov|mp3|m4a|aac|ogg|oga|wav|m3u8|mpd)(\?|$)/i
+
+/** Pages that hold a player for this item: embedded frames, and declared media whose address is a player page, not a file. Pure. */
+export const playerPages = (dom, baseUrl) => [...new Set([...embedUrls(dom, baseUrl), ...declaredMedia(dom, baseUrl).map((item) => item.url).filter((u) => !MEDIA_FILE.test(new URL(u).pathname))])]
+
+async function siteMedia(url, tab, dom) {
   const id = sites.tweetId(url)
   if (id) {
     const tweet = JSON.parse((await fetchText(sites.syndicationUrl(id))).text)
@@ -121,6 +154,7 @@ async function siteMedia(url, tab) {
   if (post) {
     const html = (await fetchText(`https://t.me/${post[1]}/${post[2]}?embed=1&mode=tme`)).text
     const src = /<video[^>]+src="([^"]+)"/.exec(html)?.[1]
+    if (!src && /message_video_player[^"]*not_supported/.test(html)) throw new Error('Telegram does not offer this video on the web (too large for its web preview): it can only be saved from a Telegram account, for example with the desktop archiver')
     return { method: 'site:telegram-embed', items: src ? [{ kind: 'video', url: src.replace(/&amp;/g, '&') }] : [] }
   }
   const shortcode = sites.instagramShortcode(url)
@@ -129,13 +163,15 @@ async function siteMedia(url, tab) {
     if (info?.error) throw new Error(info.error)
     return { method: 'site:instagram-api', items: sites.instagramMedia(info) }
   }
-  return null
+  const declared = declaredMedia(dom, url).filter((item) => !isStreamingUrl(item.url))
+  return declared.length ? { method: 'direct', declared: true, items: declared } : null
 }
 
 // JW Player (many newsrooms): the page plays one rendition but its media record lists them all. Take the tallest mp4.
 async function jwBest(tab, pageSources) {
   const timing = tab ? ((await tab.evaluate(`performance.getEntriesByType('resource').map((e) => e.name)`).catch(() => [])) ?? []) : []
-  const requested = [...Object.values(tab?.network.requests ?? {}).map((e) => e.request?.url), ...timing, ...pageSources].filter(Boolean)
+  // What was already saved for this page comes first, so a page with several clips keeps its own.
+  const requested = [...pageSources, ...Object.values(tab?.network.requests ?? {}).map((e) => e.request?.url), ...timing].filter(Boolean)
   const id = requested.map((u) => /cdn\.jwplayer\.com\/(?:videos|manifests|v2\/media)\/([A-Za-z0-9]{8})/.exec(u)?.[1]).find(Boolean)
   if (!id) return null
   const sources = JSON.parse((await fetchText(`https://cdn.jwplayer.com/v2/media/${id}`)).text).playlist?.[0]?.sources ?? []
@@ -381,23 +417,26 @@ export async function mediaLayer(url, { tab, capture, config, log }) {
 
   let site = null
   try {
-    site = await siteMedia(url, tab)
+    site = await siteMedia(url, tab, capture?.dom)
   } catch (error) {
     errors.push(`site extractor: ${error.message}`)
   }
   for (const item of site?.items ?? []) {
-    if (item.kind !== 'video') continue
+    if (item.kind !== 'video' && !(site.declared && item.kind === 'audio')) continue
     try {
       const response = await fetch(item.url, { credentials: 'include', signal: AbortSignal.timeout(MEDIA_FETCH_MS) })
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
       if (Number(response.headers.get('Content-Length') || 0) > MAX_MEDIA_BYTES) throw new Error('larger than the 1.5 GB limit')
-      files.add('video', 'site-video', await response.blob(), baseMime(response.headers.get('Content-Type')) || 'video/mp4', { capture_method: site.method, source_urls: [item.url] })
+      const type = baseMime(response.headers.get('Content-Type'))
+      if (site.declared && !/^(video|audio)\//.test(type) && type !== 'application/octet-stream') throw new Error(`not a media file (${type || 'no type'})`)
+      files.add(item.kind, site.declared ? 'page-media' : 'site-video', await response.blob(), /^(video|audio)\//.test(type) ? type : item.kind === 'audio' ? 'audio/mpeg' : 'video/mp4', { capture_method: site.method, source_urls: [item.url], ...(site.declared && { declared_in: 'page metadata' }) })
     } catch (error) {
       errors.push(`${item.url}: ${error.message}`)
     }
   }
 
-  let pageSources = metadata.page_media_sources ?? []
+  // Streams the page declares as its own clip go to the stream fetcher with whatever the player requested.
+  let pageSources = [...declaredMedia(capture?.dom, url).map((item) => item.url).filter(isStreamingUrl), ...(metadata.page_media_sources ?? [])]
   let scriptsRan = metadata.javascript_enabled !== false
   // A site extractor gives the original file; the player's own file of the same clip would only duplicate it.
   if (!files.hasAV && pageSources.length) {
@@ -424,7 +463,7 @@ export async function mediaLayer(url, { tab, capture, config, log }) {
   // A page that played one JW rendition: replace it with the tallest one.
   if (files.hasAV && files.list.some((f) => (f.properties.source_urls || []).some((u) => /cdn\.jwplayer\.com/.test(u)))) {
     try {
-      const best = await jwBest(tab, pageSources)
+      const best = await jwBest(tab, [...files.list.flatMap((f) => f.properties.source_urls || []), ...pageSources])
       if (best && !files.list.some((f) => (f.properties.source_urls || []).includes(best.url))) {
         const response = await fetch(best.url, { credentials: 'include', signal: AbortSignal.timeout(MEDIA_FETCH_MS) })
         if (response.ok) {

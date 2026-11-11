@@ -4,7 +4,7 @@
 import { browserCapture, browserCaptureTab, DownloadNavigation } from '../engine/browser.js'
 import { openCaptureWindow, closeWindow } from '../engine/cdp.js'
 import { applyVerdict, expectsMediaDownload, verifyArchive } from '../engine/quality.js'
-import { DEFAULT_MEDIA_CONFIG, embedUrls, hasPlayerHint, imageFiles, mediaLayer, playsMedia, probeMedia, removeRecordings, subtitleFiles } from '../engine/media-layer.js'
+import { DEFAULT_MEDIA_CONFIG, hasPlayerHint, imageFiles, mediaLayer, playerPages, playsMedia, probeMedia, removeRecordings, subtitleFiles } from '../engine/media-layer.js'
 import { VIDEO_INDICATOR_EXPRESSION } from '../engine/media/page-media.js'
 import { timestamp } from '../engine/timestamp.js'
 import { enrich, fallbackCapture } from '../engine/enrich.js'
@@ -87,7 +87,7 @@ async function saveMedia(id, files, result) {
 // ponytail: at most two embeds per page, each a full extra page load; raise the cap if pages with more players matter.
 async function embeddedMedia(id, dom, pageUrl, result, { windowId, temporary }) {
   let saved = false
-  for (const src of embedUrls(dom, pageUrl).slice(0, 2)) {
+  for (const src of playerPages(dom, pageUrl).slice(0, 2)) {
     let tab
     try {
       const sub = await browserCapture(src, { config: CONFIG, windowId, recordMedia: CONFIG.record_playback && expectsMediaDownload(src), log: noLog })
@@ -132,7 +132,7 @@ async function addMedia(id, url, result, tab, { manual, temporary, windowId }) {
       // Nothing indicated media on this page, or its embedded player was saved: not a failure.
       if (error.message !== 'No media found' && !fromEmbed) metadata.media_extraction_error = error.message
     }
-  } else if (windowId != null && embedUrls(dom, url).length && !(await embeddedMedia(id, dom, url, result, { windowId, temporary }))) {
+  } else if (windowId != null && playerPages(dom, url).length && !(await embeddedMedia(id, dom, url, result, { windowId, temporary }))) {
     metadata.media_extraction_error = 'the video plays inside an embedded frame from another site and could not be saved'
   }
   // Images and captions are best effort: a failure is noted in the log, not an issue.

@@ -84,6 +84,12 @@ function pickMedia(all) {
 const pngSize = file => { const b = fs.readFileSync(file); return b.length > 24 && b.toString('latin1', 1, 4) === 'PNG' ? { w: b.readUInt32BE(16), h: b.readUInt32BE(20) } : null }
 const visibleText = file => fs.readFileSync(file, 'utf8').replace(/<(script|style|noscript|template)\b[^>]*>[\s\S]*?<\/\1>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/&[a-z#0-9]+;/gi, ' ').replace(/\s+/g, ' ').trim().length
 const pdfInfo = file => { const b = fs.readFileSync(file); return { pages: (b.toString('latin1').match(/\/Type\s*\/Page(?![s\w])/g) || []).length, bytes: b.length } }
+function lastPacket(file) {
+  const r = spawnSync('ffprobe', ['-v', 'error', '-show_entries', 'packet=pts_time', '-of', 'csv=p=0', file], { encoding: 'utf8', maxBuffer: 1 << 28 })
+  const times = (r.stdout || '').trim().split('\n').map(Number).filter(Number.isFinite)
+  return times.length ? Math.max(...times.slice(-50)) : null
+}
+
 function probe(file) {
   const r = spawnSync('ffprobe', ['-v', 'error', '-show_entries', 'stream=codec_type,width,height:format=duration', '-of', 'json', file], { encoding: 'utf8' })
   if (r.status !== 0) return null
@@ -216,7 +222,10 @@ if (ONLY !== 'pages') {
     const dv = it.files.filter(isAV).map(f => ({ f, p: probe(f.file) })).filter(x => x.p).sort((a, b) => (b.p.duration || 0) - (a.p.duration || 0))[0]?.p
     const names = Object.keys(ext?.files || {})
     const ev = names.filter(n => /\.(mp4|webm|mkv|mov|ts|m4v|m4a|mp3|ogg|weba)$/i.test(n) && !/^(screenshot|preview)/.test(n)).map(n => ({ n, p: probe(ext.files[n]) })).filter(x => x.p).sort((a, b) => (b.p.duration || 0) - (a.p.duration || 0))[0]
-    const ep = ev?.p
+    // A recording comes as separate video and audio files: judge them together, and by what they really contain
+    // (the last packet), since a recording's header states the full length even when it was cut short.
+    const evAll = names.filter(n => /\.(mp4|webm|mkv|mov|ts|m4v|m4a|mp3|ogg|weba)$/i.test(n) && !/^(screenshot|preview)/.test(n)).map(n => ({ n, p: probe(ext.files[n]), end: lastPacket(ext.files[n]) })).filter(x => x.p)
+    const ep = ev && { duration: Math.min(...evAll.map(x => x.end ?? x.p.duration ?? 0)), height: Math.max(...evAll.map(x => x.p.height || 0)) || null, width: Math.max(...evAll.map(x => x.p.width || 0)) || null, audio: evAll.some(x => x.p.audio) }
     const dImages = it.files.filter(isImage).length, eImages = names.filter(n => /^media_image_/.test(n)).length
     const hasVideo = !!ep
     const durOk = hasVideo && dv?.duration != null && Math.abs((ep.duration ?? 0) - dv.duration) <= 2

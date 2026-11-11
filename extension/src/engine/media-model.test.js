@@ -83,3 +83,16 @@ describe('embedded players', () => {
     expect(embedUrls('', 'https://news.example/')).toEqual([])
   })
 })
+
+describe('declared media', () => {
+  it('reads the page\'s own clip from schema.org and og tags, and ignores player pages', async () => {
+    const { declaredMedia } = await import('./media-layer.js')
+    const dom = `<script type="application/ld+json">{"@graph":[{"@type":"NewsArticle","video":{"@type":"VideoObject","contentUrl":"https://cdn.example/clip.mp4","duration":"PT57S"}},
+      {"@type":["AudioObject"],"contentUrl":"/hosted/read-aloud"}]}</script><script type="application/ld+json">{broken</script>
+      <meta property="og:video" content="https://player.example/embed/1"><meta property="og:video:secure_url" content="https://cdn.example/clip.mp4?x=1&amp;y=2">`
+    expect(declaredMedia(dom, 'https://news.example/story')).toEqual([
+      { kind: 'video', url: 'https://cdn.example/clip.mp4' }, { kind: 'audio', url: 'https://news.example/hosted/read-aloud' },
+      { kind: 'video', url: 'https://cdn.example/clip.mp4?x=1&y=2' }])
+    expect(declaredMedia('<p>nothing</p>', 'https://news.example/')).toEqual([])
+  })
+})
