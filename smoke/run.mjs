@@ -146,7 +146,8 @@ try {
   await shot('archive')
   if (await card.count()) {
     await card.getByRole('button', { name: 'Archive' }).click()
-    const done = await until(async () => { const r = (await archive()).find(r => r.URL === article); return r && r.Status !== 'pending' && r }, 90000)
+    // Headless Chromium stops running a page that is not in front (the Google test page was opened after the app).
+    const done = await until(async () => { await app.bringToFront(); const r = (await archive()).find(r => r.URL === article); return r && r.Status !== 'pending' && r }, 90000)
     check('evidence capture completes', !!done && !!done['Evidence Hash'], done ? `${done.Status} by ${done['Captured By']} · ${done['Result Metadata']}`.slice(0, 300) : 'timed out')
     if (done) {
       const files = JSON.parse(done['Evidence Files'] || '[]').map(f => f.name)
@@ -162,7 +163,8 @@ try {
   const captureLocal = async (route, title) => {
     const u = BRIDGE + route
     await app.bringToFront()
-    await sw.evaluate(u => pipelineEnqueue({ kind: 'capture', capture: { url: u, title: u.split('/').pop(), sourceType: 'page' } }), u)
+    // Through the app page, like a content script would: Chrome may have put the idle service worker to sleep.
+    await app.evaluate(u => chrome.runtime.sendMessage({ type: 'pipeline:save', item: { kind: 'capture', capture: { url: u, title: u.split('/').pop(), sourceType: 'page' } } }), u)
     await until(() => rowFor(u))
     await app.getByRole('button', { name: 'Refresh' }).click()
     const c = app.locator('.card', { hasText: u.split('/').pop() })

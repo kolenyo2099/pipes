@@ -47,6 +47,9 @@ export class CaptureTab {
     await tab.send('Page.enable');
     await tab.send('Network.enable', { maxTotalBufferSize: 100_000_000, maxResourceBufferSize: 20_000_000, maxPostDataSize: 2_000_000 });
     await tab.send('Runtime.enable');
+    // The capture window stays in the background so it does not interrupt the user, and Chrome renders a
+    // background page lazily: printing to PDF can then wait forever for a frame. Have it behave as focused.
+    await tab.send('Emulation.setFocusEmulationEnabled', { enabled: true }).catch(() => {});
     return tab;
   }
 
