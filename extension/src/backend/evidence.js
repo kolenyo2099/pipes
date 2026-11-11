@@ -5,7 +5,7 @@ import { browserCapture, browserCaptureTab, DownloadNavigation } from '../engine
 import { openCaptureWindow, closeWindow } from '../engine/cdp.js'
 import { applyVerdict, expectsMediaDownload, verifyArchive } from '../engine/quality.js'
 import { DEFAULT_MEDIA_CONFIG, hasPlayerHint, imageFiles, mediaLayer, playerPages, playsMedia, probeMedia, removeRecordings, subtitleFiles } from '../engine/media-layer.js'
-import { VIDEO_INDICATOR_EXPRESSION } from '../engine/media/page-media.js'
+import { MEDIA_SOURCE_EXPRESSION, VIDEO_INDICATOR_EXPRESSION } from '../engine/media/page-media.js'
 import { timestamp } from '../engine/timestamp.js'
 import { enrich, fallbackCapture } from '../engine/enrich.js'
 import { sha256Hex } from '../engine/util.js'
@@ -87,6 +87,7 @@ async function saveMedia(id, files, result) {
 // ponytail: at most two embeds per page, each a full extra page load; raise the cap if pages with more players matter.
 async function embeddedMedia(id, dom, pageUrl, result, { windowId, temporary }) {
   let saved = false
+  let problem = null
   for (const src of playerPages(dom, pageUrl).slice(0, 2)) {
     let tab
     try {
@@ -102,38 +103,62 @@ async function embeddedMedia(id, dom, pageUrl, result, { windowId, temporary }) 
       }
       await saveMedia(id, found.files, result)
       saved ||= found.files.length > 0
+      // A recording cut short is saved, but must reach review as partial.
+      problem ||= found.error
     } catch (error) {
       temporary.push(...(error.temporary || []))
+      if (error.message !== 'No media found') problem ||= error.message
     } finally {
       await tab?.close()
     }
   }
-  return saved
+  return { saved, problem }
 }
 
 async function addMedia(id, url, result, tab, { manual, temporary, windowId }) {
   if (!CONFIG.media) return
   const metadata = result.metadata
-  const sources = metadata.page_media_sources || []
-  const indicator = sources.length ? false : await tab.evaluate(VIDEO_INDICATOR_EXPRESSION).catch(() => false)
-  const dom = await result.files.find((f) => f.id === 'rendered_dom')?.blob.text()
+  let sources = metadata.page_media_sources || []
+  let indicator = sources.length ? false : await tab.evaluate(VIDEO_INDICATOR_EXPRESSION).catch(() => false)
+  let dom = await result.files.find((f) => f.id === 'rendered_dom')?.blob.text()
+  // The page evidence was taken with scripts off, where a player or embed that a script inserts does not exist.
+  // If nothing media-like shows, look once more with scripts running (the evidence files are already taken).
+  if (!manual && metadata.javascript_enabled === false && !playsMedia({ url, sources, indicator, hint: hasPlayerHint(dom) }) && !playerPages(dom, url).length) {
+    try {
+      await tab.send('Emulation.setScriptExecutionDisabled', { value: false })
+      await tab.reload(30_000)
+      await tab.waitForFlag('load', 'Page.loadEventFired', 8000).catch(() => {})
+      await new Promise((resolve) => setTimeout(resolve, 2500))
+      const live = await tab.evaluate('document.documentElement.outerHTML').catch(() => null)
+      if (live) {
+        dom = live
+        sources = (await tab.evaluate(MEDIA_SOURCE_EXPRESSION).catch(() => [])) ?? []
+        indicator = sources.length ? false : await tab.evaluate(VIDEO_INDICATOR_EXPRESSION).catch(() => false)
+        Object.assign(metadata, { javascript_enabled_for_media: true })
+      }
+    } catch { /* the static view stands */ }
+  }
+  const scripted = metadata.javascript_enabled_for_media ? { ...metadata, javascript_enabled: true, page_media_sources: sources } : metadata
   if (playsMedia({ url, sources, indicator, hint: hasPlayerHint(dom) })) {
     try {
       // A manual capture never reloads the user's tab, so it cannot install the recorder: no playback recording.
       const config = { ...CONFIG, record_playback: CONFIG.record_playback && !manual }
-      const found = await mediaLayer(url, { tab, capture: { metadata, dom }, config, log: noLog })
+      const found = await mediaLayer(url, { tab, capture: { metadata: scripted, dom }, config, log: noLog })
       temporary.push(...found.temporary)
       for (const file of found.files) file.properties = { ...(await probeMedia(file.blob).catch(() => null)), ...file.properties }
       await saveMedia(id, found.files, result)
       if (found.error) metadata.media_extraction_error = found.error
     } catch (error) {
       temporary.push(...(error.temporary || []))
-      const fromEmbed = windowId != null && await embeddedMedia(id, dom, url, result, { windowId, temporary })
-      // Nothing indicated media on this page, or its embedded player was saved: not a failure.
-      if (error.message !== 'No media found' && !fromEmbed) metadata.media_extraction_error = error.message
+      const embed = windowId != null ? await embeddedMedia(id, dom, url, result, { windowId, temporary }) : { saved: false }
+      // Nothing indicated media on this page, or its embedded player was saved in full: not a failure.
+      if (embed.problem) metadata.media_extraction_error = `embedded player: ${embed.problem}`
+      else if (error.message !== 'No media found' && !embed.saved) metadata.media_extraction_error = error.message
     }
-  } else if (windowId != null && playerPages(dom, url).length && !(await embeddedMedia(id, dom, url, result, { windowId, temporary }))) {
-    metadata.media_extraction_error = 'the video plays inside an embedded frame from another site and could not be saved'
+  } else if (windowId != null && playerPages(dom, url).length) {
+    const embed = await embeddedMedia(id, dom, url, result, { windowId, temporary })
+    if (embed.problem) metadata.media_extraction_error = `embedded player: ${embed.problem}`
+    else if (!embed.saved) metadata.media_extraction_error = 'the video plays inside an embedded frame from another site and could not be saved'
   }
   // Images and captions are best effort: a failure is noted in the log, not an issue.
   try {
